@@ -8,6 +8,8 @@
 #ifndef DISPARITY_H
 #define DISPARITY_H
 
+#include <algorithm>
+
 class Image;
 
 /// Parameters specific to the disparity computation with adaptive weights
@@ -31,6 +33,5 @@ struct ParamDisparity {
 
 void disparityAW(Image im1Color, Image im2Color, int dispMin, int dispMax,
                     const ParamDisparity& param, Image& disparity, Image& disparity2);
-
 
 #endif

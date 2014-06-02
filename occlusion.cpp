@@ -3,10 +3,10 @@
  * @brief Detect and fill occlusions by left-right consistency
  * @author Pauline Tan <pauline.tan@ens-cachan.fr>
  *         Pascal Monasse <monasse@imagine.enpc.fr>
- * 
+ *
  * Copyright (c) 2012-2013, Pauline Tan, Pascal Monasse
  * All rights reserved.
- * 
+ *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -44,7 +44,7 @@ void fill_occlusion(const Image& dispDense, const Image& guidance,
                     Image& disparity, int dispMin, int dispMax,
                     const ParamOcclusion& paramOcc) {
     disparity = dispDense.weightedMedianColor(guidance,
-                                              disparity, dispMin, dispMax, 
+                                              disparity, dispMin, dispMax,
                                               paramOcc.median_radius,
                                               paramOcc.sigma_space,
                                               paramOcc.sigma_color);

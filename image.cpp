@@ -137,37 +137,3 @@ bool save_disparity(const char* fileName, const Image& disparity,
     delete [] out;
     return ok;
 }
-
-
-/// Save Disparity image in 8-bit PNG image.
-///
-/// The disparity image is computed simply scaling the disparity values by factor.
-/// Pixels outside [0,255] are assumed invalid and written in cyan color.
-bool save_disparity_factor(const char* fileName, const Image& disparity,
-                    int dMin, int dMax, int factor)
-{
-    const int w=disparity.width(), h=disparity.height();
-    const float* in=&(const_cast<Image&>(disparity))(0,0);
-    unsigned char *out = new unsigned char[3*w*h];
-    unsigned char *red=out, *green=out+w*h, *blue=out+2*w*h;
-    if(dMin<0)
-        factor=-factor;
-    for(size_t i=w*h; i>0; i--, in++, red++) {
-        if((float)dMin<=*in && *in<=(float)dMax) {
-            float v = factor* *in +0.5f;
-            if(v<0) v=0;
-            if(v>255) v=255;
-            *red = static_cast<unsigned char>(v);
-            *green++ = *red;
-            *blue++  = *red;
-        } else { // Cyan for disparities out of range
-            *red=0;
-            *green++ = *blue++ = 255;
-        }
-    }
-    bool ok = (io_png_write_u8(fileName, out, w, h, 3) == 0);
-    delete [] out;
-    return ok;
-}
-
-

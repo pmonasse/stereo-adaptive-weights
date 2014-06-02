@@ -1,4 +1,4 @@
-Stereo Disparity using Yoon and Kweon's Adaptive Weights.
+Bilaterally Weighted Patches for Disparity Map Computation.
 
 Laura F. Julià, <fernandl@imagine.enpc.fr>, Imagine, ENPC, France
 Pascal Monasse, <monasse@imagine.enpc.fr>, Imagine, ENPC, France

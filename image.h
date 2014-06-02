@@ -75,7 +75,5 @@ private:
 
 bool save_disparity(const char* file_name, const Image& disparity,
                     int dMin, int dMax, int grayMin, int grayMax);
-bool save_disparity_factor(const char* fileName, const Image& disparity,
-                    int dMin, int dMax, int factor);
 
 #endif

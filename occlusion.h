@@ -3,10 +3,10 @@
  * @brief Detect and fill occlusions by left-right consistency
  * @author Pauline Tan <pauline.tan@ens-cachan.fr>
  *         Pascal Monasse <monasse@imagine.enpc.fr>
- * 
+ *
  * Copyright (c) 2012-2013, Pauline Tan, Pascal Monasse
  * All rights reserved.
- * 
+ *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -31,8 +31,8 @@ struct ParamOcclusion {
     // Constructor with default parameters
     ParamOcclusion()
     : tol_disp(1),
-      sigma_space(9), 
-      sigma_color(255*0.1f), 
+      sigma_space(9),
+      sigma_color(255*0.1f),
       median_radius(9) {}
 };
 
