@@ -16,16 +16,18 @@
 
 /// Combination of weights, defined at compile time. Usage of a function pointer
 /// is significantly slower, unfortunately.
-#if defined(COMB_PLUS)
-    static float COMB_WEIGHTS(float w1, float w2) { return w1+w2; }
-#elif defined(COMB_MIN)
-    static float COMB_WEIGHTS(float w1, float w2) { return std::min(w1,w2); }
+#if   defined(COMB_LEFT)
+    static float COMB_WEIGHTS(float w1, float)    { return w1; }
 #elif defined(COMB_MAX)
     static float COMB_WEIGHTS(float w1, float w2) { return std::max(w1,w2); }
-#elif defined(COMB_LEFT)
-    static float COMB_WEIGHTS(float w1, float) { return w1; }
-#else
+#elif defined(COMB_MIN)
+    static float COMB_WEIGHTS(float w1, float w2) { return std::min(w1,w2); }
+#elif defined(COMB_MULT)
     static float COMB_WEIGHTS(float w1, float w2) { return w1*w2; }
+#elif defined(COMB_PLUS)
+    static float COMB_WEIGHTS(float w1, float w2) { return w1+w2; }
+#else
+#error "Unknown combination of weights"
 #endif
 
 /// Computes image of raw matching costs e at disparity d.

@@ -5,7 +5,6 @@
  *         Pascal Monasse <monasse@imagine.enpc.fr>
  */
 
-
 #include "disparity.h"
 #include "occlusion.h"
 #include "image.h"
@@ -16,6 +15,10 @@
 /// Names of output image files
 static const char* OUTFILE1="disparity.png";
 static const char* OUTFILE2="disparity_postprocessed.png";
+
+#ifndef COMB
+#error "The macro COMB must be set to one of the allowed values at compilation"
+#endif
 
 /// Usage description
 static void usage(const char* name) {
@@ -33,10 +36,12 @@ static void usage(const char* name) {
               <<p.window_radius << ")\n"
               << "    -A alpha: value of alpha for matching cost ("
               <<p.alpha<<")\n"
-              << "    -t T: threshold for color difference in matching cost ("
+              << "    -t T: threshold of color difference in matching cost ("
               <<p.color_threshold<<")\n"
-              << "    -g G: threshold for gradient difference in matching cost ("
-              <<p.gradient_threshold << ")\n\n"
+              << "    -g G: threshold of gradient difference in matching cost ("
+              <<p.gradient_threshold << ")\n"
+              << "    Combination of weights is '" << COMB
+              << "' (recompile to change it)\n\n"
               << "Occlusion detection:\n"
               << "    -o tolDiffDisp: tolerance for left-right disp. diff. ("
               <<q.tol_disp << ")\n\n"

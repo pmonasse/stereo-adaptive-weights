@@ -1,8 +1,8 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+cmake_minimum_required(VERSION 2.6)
 
-FIND_PACKAGE(PNG)
+find_package(PNG)
 
-SET(SRC
+set(SRC
     cmdLine.h
     disparity.cpp disparity.h
     filters.cpp
@@ -11,33 +11,35 @@ SET(SRC
     main.cpp
     occlusion.cpp occlusion.h)
 
-SET(SRC2
+set(SRC2
     cmdLine.h
     image.cpp image.h
     io_png.c io_png.h
     main2.cpp
     show_weights.cpp)
 
-ADD_EXECUTABLE(stereoAdaptiveWeights ${SRC})
-TARGET_LINK_LIBRARIES(stereoAdaptiveWeights ${PNG_LIBRARIES})
+add_executable(stereoAdaptiveWeights ${SRC})
+target_link_libraries(stereoAdaptiveWeights ${PNG_LIBRARIES})
 
-ADD_EXECUTABLE(show_weights ${SRC2})
-TARGET_LINK_LIBRARIES(show_weights ${PNG_LIBRARIES})
+add_executable(show_weights ${SRC2})
+target_link_libraries(show_weights ${PNG_LIBRARIES})
 
-SET(COMBINE_WEIGHTS mult CACHE STRING "Weights combination (should be mult, plus, min, max or left")
-IF(COMBINE_WEIGHTS STREQUAL "mult")
-  ADD_DEFINITIONS(-DCOMB_MULT)
-ELSEIF(COMBINE_WEIGHTS STREQUAL "plus")
-  ADD_DEFINITIONS(-DCOMB_PLUS)
-ELSEIF(COMBINE_WEIGHTS STREQUAL "min")
-  ADD_DEFINITIONS(-DCOMB_MIN)
-ELSEIF(COMBINE_WEIGHTS STREQUAL "max")
-  ADD_DEFINITIONS(-DCOMB_MAX)
-ELSEIF(COMBINE_WEIGHTS STREQUAL "left")
-  ADD_DEFINITIONS(-DCOMB_LEFT)
-ELSE(COMBINE_WEIGHTS STREQUAL "mult")
-  MESSAGE(SEND_ERROR "Invalid variable COMBINE_WEIGHTS (see allowed values)")
-ENDIF(COMBINE_WEIGHTS STREQUAL "mult")
+set(COMBINE_WEIGHTS mult CACHE STRING
+    "Weights combination (should be mult, plus, min, max or left")
+add_definitions(-DCOMB="${COMBINE_WEIGHTS}")
+if(    COMBINE_WEIGHTS STREQUAL "left")
+  add_definitions(-DCOMB_LEFT)
+elseif(COMBINE_WEIGHTS STREQUAL "max")
+  add_definitions(-DCOMB_MAX)
+elseif(COMBINE_WEIGHTS STREQUAL "min")
+  add_definitions(-DCOMB_MIN)
+elseif(COMBINE_WEIGHTS STREQUAL "mult")
+  add_definitions(-DCOMB_MULT)
+elseif(COMBINE_WEIGHTS STREQUAL "plus")
+  add_definitions(-DCOMB_PLUS)
+else(  COMBINE_WEIGHTS STREQUAL "left")
+  message(SEND_ERROR "Invalid variable COMBINE_WEIGHTS (see allowed values)")
+endif( COMBINE_WEIGHTS STREQUAL "left")
 
 FIND_PACKAGE(OpenMP)
 IF(OPENMP_FOUND)
