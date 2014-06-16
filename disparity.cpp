@@ -132,53 +132,95 @@ void disparityAW(Image im1Color, Image im2Color,              // the two color i
     const int dim=2*r+1; // window dimension
 
 #pragma omp parallel for
-    for(int yp=0; yp<height; yp++)
-    for(int xp=0; xp<width; xp++)
-        for(int d=dispMin; d<=dispMax; d++) {
-            // raw matching cost for disparity d
-            const Image& dCost = *cost[d-dispMin];
-            if(xp+d>=0 && xp+d<width) {
-                float nom=0, den=0;
+    for(int yp=0; yp<height; yp++){
+        // Image window for the weights in the reference image
+        Image weights1(dim,dim);
+        // Vector of weights windows on the target image
+        Image** weights = new Image*[nd];
+        for(int d=dispMin; d<=dispMax; d++)
+            weights[d-dispMin] = new Image(dim,dim);
+
+        for(int xp=0; xp<width; xp++){
+
+            // Compute weights on reference window and one or several target windows (for possible disparities).
+
+            // Reference window weights
+            for(int y=-r; y<=r; y++)
+            if(yp+y>=0 && yp+y<height)
+            for(int x=-r; x<=r; x++)
+            if(xp+x>=0 && xp+x<width){
+                int dist_s1=0;
+                dist_s1 += abs(im1R(xp+x,yp+y)-im1R(xp,yp));
+                dist_s1 += abs(im1G(xp+x,yp+y)-im1G(xp,yp));
+                dist_s1 += abs(im1B(xp+x,yp+y)-im1B(xp,yp));
+                weights1(x+r,y+r)=distS[dist_s1]*distP[(y+r)*dim+(x+r)];
+            }
+#ifndef COMB_LEFT
+            // Target window weights for all possible disparities
+            for(int d=dispMax; d>=dispMin; d--){
+                Image& weights2 = *weights[(xp+d-dispMin)%nd];
                 for(int y=-r; y<=r; y++)
                 if(yp+y>=0 && yp+y<height)
                 for(int x=-r; x<=r; x++)
-                if(xp+x>=0 && xp+x<width && xp+x+d>=0 && xp+x+d<width) {
-                    // Weight p in the left image
-                    int dist_s1=0;
-                    dist_s1 += abs(im1R(xp+x,yp+y)-im1R(xp,yp));
-                    dist_s1 += abs(im1G(xp+x,yp+y)-im1G(xp,yp));
-                    dist_s1 += abs(im1B(xp+x,yp+y)-im1B(xp,yp));
-                    float w1=distS[dist_s1]*distP[(y+r)*dim+(x+r)];
-                    // Weight q in the right image
-#ifdef COMB_LEFT
-                    float w2=1;
-#else
+                if(d+xp>=0 && d+xp<width && xp+x+d>=0 && xp+x+d<width){
                     int dist_s2=0;
                     dist_s2 += abs(im2R(xp+x+d,yp+y)-im2R(xp+d,yp));
                     dist_s2 += abs(im2G(xp+x+d,yp+y)-im2G(xp+d,yp));
                     dist_s2 += abs(im2B(xp+x+d,yp+y)-im2B(xp+d,yp));
-                    float w2=distS[dist_s2]*distP[(y+r)*dim+(x+r)];
+                    weights2(x+r,y+r)=distS[dist_s2]*distP[(y+r)*dim+(x+r)];
+                }
+                //if we are not in the first xp of the line we do not need to update the rest of target windows
+                if(xp!=0)
+                    break;
+            }
 #endif
+            // Compute dissimilarity for all possible disparities
+            for(int d=dispMin; d<=dispMax; d++) {
+                // raw matching cost for disparity d
+                const Image& dCost = *cost[d-dispMin];
+#ifndef COMB_LEFT
+                // Weights image of target window
+                const Image& weights2 = *weights[(xp+d-dispMin)%nd];
+#endif
+                if(xp+d>=0 && xp+d<width) {
+                    float nom=0, den=0;
+                    for(int y=-r; y<=r; y++)
+                    if(yp+y>=0 && yp+y<height)
+                    for(int x=-r; x<=r; x++)
+                    if(xp+x>=0 && xp+x<width && xp+x+d>=0 && xp+x+d<width) {
+                        // Weight p in the left image
+                        float w1=weights1(x+r,y+r);
+                        // Weight q in the right image
+#ifdef COMB_LEFT
+                        float w2=1;
+#else
+                        float w2=weights2(x+r,y+r);
+#endif
+                        // Combination of weights and raw cost
+                        nom+=COMB_WEIGHTS(w1,w2)*dCost(xp+x,yp+y);
+                        // normalization term
+                        den+=COMB_WEIGHTS(w1,w2);
+                    }
+                    // Dissimilarity for this disparity
+                    float E=nom/den;
 
-                    // Combination of weights and raw cost
-                    nom+=COMB_WEIGHTS(w1,w2)*dCost(xp+x,yp+y);
-                    // normalization term
-                    den+=COMB_WEIGHTS(w1,w2);
-                }
-                // Dissimilarity for this disparity
-                float E=nom/den;
-
-                // Winner takes all label selection
-                if(E1(xp,yp) > E) {
-                    E1(xp,yp) = E;
-                    disparity(xp,yp) = d;
-                }
-                if(E2(xp+d,yp) > E) {
-                    E2(xp+d,yp) = E;
-                    disparity2(xp+d,yp)= -d;
+                    // Winner takes all label selection
+                    if(E1(xp,yp) > E) {
+                        E1(xp,yp) = E;
+                        disparity(xp,yp) = d;
+                    }
+                    if(E2(xp+d,yp) > E) {
+                        E2(xp+d,yp) = E;
+                        disparity2(xp+d,yp)= -d;
+                    }
                 }
             }
         }
+        // Delete weight images
+        for(int d=dispMin; d<=dispMax; d++)
+            delete weights[d-dispMin];
+        delete [] weights;
+    }
     // Delete cost images
     for(int d=dispMin; d<=dispMax; d++)
         delete cost[d-dispMin];
