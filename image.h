@@ -3,7 +3,7 @@
  * @brief image class with shallow copy
  * @author Pascal Monasse <monasse@imagine.enpc.fr>
  *
- * Copyright (c) 2012-2013, Pascal Monasse
+ * Copyright (c) 2012-2014, Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -33,6 +33,7 @@ class Image {
     int w, h;
     void kill();
 public:
+    Image();
     Image(int width, int height);
     Image(float* pix, int width, int height);
     Image(const Image& I);
@@ -48,11 +49,6 @@ public:
     Image r() const { return Image(tab+0*w*h,w,h); }
     Image g() const { return Image(tab+1*w*h,w,h); }
     Image b() const { return Image(tab+2*w*h,w,h); }
-
-    Image operator+(const Image& I) const;
-    Image operator-(const Image& I) const;
-    Image operator*(const Image& I) const;
-    Image& operator+=(const Image& I);
 
     // Filters (implemented in filters.cpp)
     Image gradX() const;

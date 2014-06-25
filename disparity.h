@@ -32,6 +32,7 @@ struct ParamDisparity {
 };
 
 void disparityAW(Image im1Color, Image im2Color, int dispMin, int dispMax,
-                    const ParamDisparity& param, Image& disparity, Image& disparity2);
+                 const ParamDisparity& param,
+                 Image& disparity1, Image& disparity2);
 
 #endif

@@ -41,16 +41,16 @@ else(  COMBINE_WEIGHTS STREQUAL "left")
   message(SEND_ERROR "Invalid variable COMBINE_WEIGHTS (see allowed values)")
 endif( COMBINE_WEIGHTS STREQUAL "left")
 
-FIND_PACKAGE(OpenMP)
-IF(OPENMP_FOUND)
-    SET_TARGET_PROPERTIES(stereoAdaptiveWeights PROPERTIES
+find_package(OpenMP)
+if(OPENMP_FOUND)
+    set_target_properties(stereoAdaptiveWeights PROPERTIES
                           COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
-ENDIF(OPENMP_FOUND)
+endif(OPENMP_FOUND)
 
-IF(UNIX)
-    SET_TARGET_PROPERTIES(stereoAdaptiveWeights PROPERTIES
+if(UNIX)
+    set_target_properties(stereoAdaptiveWeights PROPERTIES
                           COMPILE_FLAGS "-Wall -Wextra -Werror ${OpenMP_CXX_FLAGS}")
-    IF(OPENMP_FOUND)
-        SET(CMAKE_EXE_LINKER_FLAGS  ${OpenMP_CXX_FLAGS})
-    ENDIF(OPENMP_FOUND)
-ENDIF(UNIX)
+    if(OPENMP_FOUND)
+        set(CMAKE_EXE_LINKER_FLAGS  ${OpenMP_CXX_FLAGS})
+    endif(OPENMP_FOUND)
+endif(UNIX)

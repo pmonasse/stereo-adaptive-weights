@@ -3,7 +3,7 @@
  * @brief image class with shallow copy
  * @author Pascal Monasse <monasse@imagine.enpc.fr>
  *
- * Copyright (c) 2012-2013, Pascal Monasse
+ * Copyright (c) 2012-2014, Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -21,6 +21,12 @@
 #include <cassert>
 
 /// Constructor
+///
+/// The main interest of this one is to allow arrays of Image.
+Image::Image()
+: count(0), tab(0), w(0), h(0) {}
+
+/// Constructor
 Image::Image(int width, int height)
 : count(new int(1)), tab(new float[width*height]), w(width), h(height) {}
 
@@ -32,7 +38,7 @@ Image::Image(float* pix, int width, int height)
 
 /// Copy constructor (shallow copy)
 Image::Image(const Image& I)
-  : count(I.count), tab(I.tab), w(I.w), h(I.h) {
+: count(I.count), tab(I.tab), w(I.w), h(I.h) {
     if(count)
         ++*count;
 }
@@ -63,56 +69,12 @@ void Image::kill() {
     }
 }
 
-/// Addition
-Image Image::operator+(const Image& I) const {
-    assert(w==I.w && h==I.h);
-    Image S(w,h);
-    float* out=S.tab;
-    const float *in1=tab, *in2=I.tab;
-    for(int i=w*h-1; i>=0; i--)
-        *out++ = *in1++ + *in2++;
-    return S;
-}
-
-/// Addition
-Image& Image::operator+=(const Image& I) {
-    assert(w==I.w && h==I.h);
-    float* out=tab;
-    const float *in=I.tab;
-    for(int i=w*h-1; i>=0; i--)
-        *out++ += *in++;
-    return *this;
-}
-
-/// Subtraction
-Image Image::operator-(const Image& I) const {
-    assert(w==I.w && h==I.h);
-    Image S(w,h);
-    float* out=S.tab;
-    const float *in1=tab, *in2=I.tab;
-    for(int i=w*h-1; i>=0; i--)
-        *out++ = *in1++ - *in2++;
-    return S;
-}
-
-/// Pixel-wise multiplication
-Image Image::operator*(const Image& I) const {
-    assert(w==I.w && h==I.h);
-    Image S(w,h);
-    float* out=S.tab;
-    const float *in1=tab, *in2=I.tab;
-    for(int i=w*h-1; i>=0; i--)
-        *out++ = *in1++ * *in2++;
-    return S;
-}
-
 /// Save \a disparity image in 8-bit PNG image.
 ///
 /// The disp->gray function is affine: gray=a*disp+b.
 /// Pixels outside [0,255] are assumed invalid and written in cyan color.
 bool save_disparity(const char* fileName, const Image& disparity,
-                    int dMin, int dMax, int grayMin, int grayMax)
-{
+                    int dMin, int dMax, int grayMin, int grayMax) {
     const float a=(grayMax-grayMin)/float(dMax-dMin);
     const float b=(grayMin*dMax-grayMax*dMin)/float(dMax-dMin);
 

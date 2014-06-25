@@ -34,18 +34,20 @@
 ///
 /// At each pixel, a linear combination of colors L1 distance (with max
 /// threshold) and x-derivatives absolute difference (with max threshold).
-static void e_cost(Image im1R, Image im1G, Image im1B,      // color channels reference image
-                   Image im2R, Image im2G, Image im2B,  // color channels target image
-                   Image gradient1, Image gradient2,    // gradients of the two images
-                   int d,                               // disparity value
-                   const ParamDisparity& param,         // parameters
-                   Image& cost)                          // output cost image
-{
+/// \param im1R,im1G,im1B the color channels of image 1
+/// \param im2R,im2G,im2B the color channels of image 2
+/// \param gradient1,gradient2 the gradient images
+/// \param d the disparity (layer of the cost volume)
+/// \param param parameters for cost computation
+static Image costLayer(Image im1R, Image im1G, Image im1B,
+                       Image im2R, Image im2G, Image im2B,
+                       Image gradient1, Image gradient2,
+                       int d, const ParamDisparity& param) {
     const int width=im1R.width(), height=im1R.height();
+    Image cost(width,height);
     for(int y=0; y<height; y++)
         for(int x=0; x<width; x++) {
-
-            // If there is no corresponding disparity point, we assign maximal color difference.
+            // Max distance if disparity moves outside image
             float costColor = param.color_threshold;
             float costGradient = param.gradient_threshold;
 
@@ -55,10 +57,9 @@ static void e_cost(Image im1R, Image im1G, Image im1B,      // color channels re
                 float col1[3] = {im1R(x,y), im1G(x,y), im1B(x,y)};
                 float col2[3] = {im2R(x+d,y), im2G(x+d,y), im2B(x+d,y)};
                 costColor = 0;
-                for(int i=0; i<3; i++) {
+                for(int i=0; i<3; i++)
                     costColor += abs(col1[i]-col2[i]);
-                }
-                costColor *= 1.0/3;
+                costColor *= 1.0f/3;
                 // Color threshold
                 if(costColor > param.color_threshold)
                     costColor = param.color_threshold;
@@ -73,17 +74,22 @@ static void e_cost(Image im1R, Image im1G, Image im1B,      // color channels re
             // Linear combination of the two penalties
             cost(x,y) = (1-param.alpha)*costColor + param.alpha*costGradient;
         }
+    return cost;
 }
 
 /// Adaptive Weights disparity computation
 ///
 /// The dissimilarity is computed putting adaptative
 /// weights on the raw matching cost
-void disparityAW(Image im1Color, Image im2Color,              // the two color images
-                 int dispMin, int dispMax,            // disparity bounds
-                 const ParamDisparity& param,         // Parameters
-                 Image& disparity, Image& disparity2)  // Output disparity images
-{
+/// \param im1Color,im2Color the two color images
+/// \param dispMin,dispMax disparity range
+/// \param param cost parameters
+/// \param disparity1 output disparity map from image 1 to image 2
+/// \param disparity2 output disparity map from image 2 to image 1
+void disparityAW(Image im1Color, Image im2Color,
+                 int dispMin, int dispMax,
+                 const ParamDisparity& param,
+                 Image& disparity1, Image& disparity2) {
     // Getting the three color channels (between 0 and 255)
     Image im1R=im1Color.r(), im1G=im1Color.g(), im1B=im1Color.b();
     Image im2R=im2Color.r(), im2G=im2Color.g(), im2B=im2Color.b();
@@ -93,13 +99,13 @@ void disparityAW(Image im1Color, Image im2Color,              // the two color i
     const int nd = dispMax-dispMin+1;                    // Disparity range
     std::cout << "Range of disparities: " << nd << " disparities, "<<std::endl;
 
-    // Sample of color similarity strengths depending on the color distance
+    // Tabulated proximity weights (color distance)
     std::vector<float> distS;
     float e2=exp(-1/(3*param.gamma_s));
     for(int x=0; x<=3*255; x++)
         distS.push_back(pow(e2,x));
 
-    // Sample of proximity strengths depending on x and y positions in the square neighborhood
+    // Tabulated proximity weights (spatial distance)
     std::vector<float> distP;
     float e1=exp(-1/param.gamma_p);
     for(int y=-r; y<=r; y++)
@@ -115,14 +121,12 @@ void disparityAW(Image im1Color, Image im2Color,              // the two color i
     Image gradient2 = im2Gray.gradX();
 
     // Compute raw matching cost for all possible disparities.
-    Image** cost = new Image*[nd];
+    Image* cost = new Image[nd];
     for(int d=dispMin; d<=dispMax; d++) {
-        cost[d-dispMin] = new Image(width,height);
-        e_cost(im1R,im1G,im1B, im2R,im2G,im2B, gradient1, gradient2,
-               d, param, *cost[d-dispMin]);
+        cost[d-dispMin] = 
+            costLayer(im1R,im1G,im1B, im2R,im2G,im2B, gradient1, gradient2,
+                      d, param);
     }
-
-    // Dissimilarity computation
 
     // Images for the two parts of the dissimilarity
     Image E1(width,height), E2(width,height);
@@ -136,9 +140,9 @@ void disparityAW(Image im1Color, Image im2Color,              // the two color i
         // Image window for the weights in the reference image
         Image weights1(dim,dim);
         // Vector of weights windows on the target image
-        Image** weights = new Image*[nd];
+        Image* weights = new Image[nd];
         for(int d=dispMin; d<=dispMax; d++)
-            weights[d-dispMin] = new Image(dim,dim);
+            weights[d-dispMin] = Image(dim,dim);
 
         for(int xp=0; xp<width; xp++){
 
@@ -158,7 +162,7 @@ void disparityAW(Image im1Color, Image im2Color,              // the two color i
 #ifndef COMB_LEFT
             // Target window weights for all possible disparities
             for(int d=dispMax; d>=dispMin; d--){
-                Image& weights2 = *weights[(xp+d-dispMin)%nd];
+                Image& weights2 = weights[(xp+d-dispMin)%nd];
                 for(int y=-r; y<=r; y++)
                 if(yp+y>=0 && yp+y<height)
                 for(int x=-r; x<=r; x++)
@@ -177,10 +181,10 @@ void disparityAW(Image im1Color, Image im2Color,              // the two color i
             // Compute dissimilarity for all possible disparities
             for(int d=dispMin; d<=dispMax; d++) {
                 // raw matching cost for disparity d
-                const Image& dCost = *cost[d-dispMin];
+                const Image& dCost = cost[d-dispMin];
 #ifndef COMB_LEFT
                 // Weights image of target window
-                const Image& weights2 = *weights[(xp+d-dispMin)%nd];
+                const Image& weights2 = weights[(xp+d-dispMin)%nd];
 #endif
                 if(xp+d>=0 && xp+d<width) {
                     float nom=0, den=0;
@@ -207,7 +211,7 @@ void disparityAW(Image im1Color, Image im2Color,              // the two color i
                     // Winner takes all label selection
                     if(E1(xp,yp) > E) {
                         E1(xp,yp) = E;
-                        disparity(xp,yp) = d;
+                        disparity1(xp,yp) = d;
                     }
                     if(E2(xp+d,yp) > E) {
                         E2(xp+d,yp) = E;
@@ -216,14 +220,7 @@ void disparityAW(Image im1Color, Image im2Color,              // the two color i
                 }
             }
         }
-        // Delete weight images
-        for(int d=dispMin; d<=dispMax; d++)
-            delete weights[d-dispMin];
         delete [] weights;
     }
-    // Delete cost images
-    for(int d=dispMin; d<=dispMax; d++)
-        delete cost[d-dispMin];
     delete [] cost;
 }
-
