@@ -77,6 +77,31 @@ static Image costLayer(Image im1R, Image im1G, Image im1B,
     return cost;
 }
 
+/// Fill support weights.
+///
+/// \param im1R,im1G,im1B The image channels
+/// \param xp,yp Center point
+/// \param r Window radius
+/// \param distC Tabulated color distances
+/// \param distP Tabulated position distances
+/// \param w The output support window
+static void support(const Image& im1R, const Image& im1G, const Image& im1B,
+                    int xp, int yp, int r,
+                    float* distC, float* distP,
+                    Image& w) {
+    const int width=im1R.width(), height=im1R.height();
+    for(int y=-r; y<=r; y++)
+        if(0<=yp+y && yp+y<height)
+            for(int x=-r; x<=r; x++)
+                if(0<=xp+x && xp+x<width) {
+                    int d=0;
+                    d += std::abs(im1R(xp+x,yp+y)-im1R(xp,yp));
+                    d += std::abs(im1G(xp+x,yp+y)-im1G(xp,yp));
+                    d += std::abs(im1B(xp+x,yp+y)-im1B(xp,yp));
+                    w(x+r,y+r)=distC[d]*distP[(y+r)*w.width()+(x+r)];
+                }
+}
+
 /// Adaptive Weights disparity computation
 ///
 /// The dissimilarity is computed putting adaptative
@@ -100,17 +125,18 @@ void disparityAW(Image im1Color, Image im2Color,
     std::cout << "Range of disparities: " << nd << " disparities, "<<std::endl;
 
     // Tabulated proximity weights (color distance)
-    std::vector<float> distS;
+    float* distC = new float[3*255+1];
     float e2=exp(-1/(3*param.gamma_s));
     for(int x=0; x<=3*255; x++)
-        distS.push_back(pow(e2,x));
+        distC[x] = pow(e2,x);
 
     // Tabulated proximity weights (spatial distance)
-    std::vector<float> distP;
+    const int dim=2*r+1; // window dimension
+    float *distP = new float[dim*dim], *d=distP;
     float e1=exp(-1/param.gamma_p);
     for(int y=-r; y<=r; y++)
     for(int x=-r; x<=r; x++)
-        distP.push_back(pow(e1,sqrt((float)(x*x+y*y))));
+        *d++ = pow(e1,sqrt((float)(x*x+y*y)));
 
     // Compute x-derivatives of both images
     Image im1Gray(width,height);
@@ -120,7 +146,7 @@ void disparityAW(Image im1Color, Image im2Color,
     Image gradient1 = im1Gray.gradX();
     Image gradient2 = im2Gray.gradX();
 
-    // Compute raw matching cost for all possible disparities.
+    // Compute raw matching cost for all disparities.
     Image* cost = new Image[nd];
     for(int d=dispMin; d<=dispMax; d++) {
         cost[d-dispMin] = 
@@ -128,15 +154,13 @@ void disparityAW(Image im1Color, Image im2Color,
                       d, param);
     }
 
-    // Images for the two parts of the dissimilarity
+    // Images of dissimilarity 1->2 and 2->1
     Image E1(width,height), E2(width,height);
     std::fill_n(&E1(0,0), width*height, std::numeric_limits<float>::max());
     std::fill_n(&E2(0,0), width*height, std::numeric_limits<float>::max());
 
-    const int dim=2*r+1; // window dimension
-
 #pragma omp parallel for
-    for(int yp=0; yp<height; yp++){
+    for(int yp=0; yp<height; yp++) {
         // Image window for the weights in the reference image
         Image weights1(dim,dim);
         // Vector of weights windows on the target image
@@ -144,39 +168,19 @@ void disparityAW(Image im1Color, Image im2Color,
         for(int d=dispMin; d<=dispMax; d++)
             weights[d-dispMin] = Image(dim,dim);
 
-        for(int xp=0; xp<width; xp++){
-
-            // Compute weights on reference window and one or several target windows (for possible disparities).
-
-            // Reference window weights
-            for(int y=-r; y<=r; y++)
-            if(yp+y>=0 && yp+y<height)
-            for(int x=-r; x<=r; x++)
-            if(xp+x>=0 && xp+x<width){
-                int dist_s1=0;
-                dist_s1 += abs(im1R(xp+x,yp+y)-im1R(xp,yp));
-                dist_s1 += abs(im1G(xp+x,yp+y)-im1G(xp,yp));
-                dist_s1 += abs(im1B(xp+x,yp+y)-im1B(xp,yp));
-                weights1(x+r,y+r)=distS[dist_s1]*distP[(y+r)*dim+(x+r)];
-            }
 #ifndef COMB_LEFT
-            // Target window weights for all possible disparities
-            for(int d=dispMax; d>=dispMin; d--){
-                Image& weights2 = weights[(xp+d-dispMin)%nd];
-                for(int y=-r; y<=r; y++)
-                if(yp+y>=0 && yp+y<height)
-                for(int x=-r; x<=r; x++)
-                if(d+xp>=0 && d+xp<width && xp+x+d>=0 && xp+x+d<width){
-                    int dist_s2=0;
-                    dist_s2 += abs(im2R(xp+x+d,yp+y)-im2R(xp+d,yp));
-                    dist_s2 += abs(im2G(xp+x+d,yp+y)-im2G(xp+d,yp));
-                    dist_s2 += abs(im2B(xp+x+d,yp+y)-im2B(xp+d,yp));
-                    weights2(x+r,y+r)=distS[dist_s2]*distP[(y+r)*dim+(x+r)];
-                }
-                //if we are not in the first xp of the line we do not need to update the rest of target windows
-                if(xp!=0)
-                    break;
-            }
+        // Target window weights for all disparities except dispMax
+        for(int d=dispMin; d<dispMax; d++)
+            support(im2R, im2G, im2B, 0+d,yp, r, distC, distP,
+                    weights[(0+d-dispMin)%nd]);
+#endif
+        for(int xp=0; xp<width; xp++) {
+            // Reference window weights
+            support(im1R, im1G, im1B, xp,yp, r, distC, distP, weights1);
+#ifndef COMB_LEFT
+            // Target window weights at disparity dispMax
+            support(im2R, im2G, im2B, xp+dispMax,yp, r, distC, distP,
+                    weights[(xp+dispMax-dispMin)%nd]);
 #endif
             // Compute dissimilarity for all possible disparities
             for(int d=dispMin; d<=dispMax; d++) {
@@ -186,12 +190,12 @@ void disparityAW(Image im1Color, Image im2Color,
                 // Weights image of target window
                 const Image& weights2 = weights[(xp+d-dispMin)%nd];
 #endif
-                if(xp+d>=0 && xp+d<width) {
-                    float nom=0, den=0;
+                if(0<=xp+d && xp+d<width) {
+                    float num=0, den=0;
                     for(int y=-r; y<=r; y++)
-                    if(yp+y>=0 && yp+y<height)
+                    if(0<=yp+y && yp+y<height)
                     for(int x=-r; x<=r; x++)
-                    if(xp+x>=0 && xp+x<width && xp+x+d>=0 && xp+x+d<width) {
+                    if(0<=xp+x && xp+x<width && 0<=xp+x+d && xp+x+d<width) {
                         // Weight p in the left image
                         float w1=weights1(x+r,y+r);
                         // Weight q in the right image
@@ -201,12 +205,12 @@ void disparityAW(Image im1Color, Image im2Color,
                         float w2=weights2(x+r,y+r);
 #endif
                         // Combination of weights and raw cost
-                        nom+=COMB_WEIGHTS(w1,w2)*dCost(xp+x,yp+y);
+                        num+=COMB_WEIGHTS(w1,w2)*dCost(xp+x,yp+y);
                         // normalization term
                         den+=COMB_WEIGHTS(w1,w2);
                     }
                     // Dissimilarity for this disparity
-                    float E=nom/den;
+                    float E=num/den;
 
                     // Winner takes all label selection
                     if(E1(xp,yp) > E) {
@@ -223,4 +227,6 @@ void disparityAW(Image im1Color, Image im2Color,
         delete [] weights;
     }
     delete [] cost;
+    delete [] distC;
+    delete [] distP;
 }
