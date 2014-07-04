@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 		usage(argv[0], radius, gamma_s, gamma_p);
 		return 1;
 	}
-	if(!(argc=5 && combine==0) && !(argc=7 && combine==1)) {
+	if(!(argc==5 && combine==0) && !(argc==7 && combine==1)) {
 		usage(argv[0], radius, gamma_s, gamma_p);
 		return 1;
 	}
