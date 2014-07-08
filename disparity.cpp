@@ -13,6 +13,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <cassert>
 
 /// Combination of weights, defined at compile time. Usage of a function pointer
 /// is significantly slower, unfortunately.
@@ -30,20 +31,32 @@
 #error "Unknown combination of weights"
 #endif
 
+/// Convert image \a in to gray scale.
+Image gray(const Image& in) {
+    if(in.channels() == 1)
+        return in.clone();
+    assert(in.channels() == 3);
+    const int w=in.width(), h=in.height();
+    Image out(w,h);
+    for(int y=0; y<h; y++)
+        for(int x=0; x<w; x++)
+            out(x,y) = rgb_to_gray(in(x,y,0), in(x,y,1), in(x,y,2));
+    return out;
+}
+
 /// Computes image of raw matching costs e at disparity d.
 ///
 /// At each pixel, a linear combination of colors L1 distance (with max
 /// threshold) and x-derivatives absolute difference (with max threshold).
-/// \param im1R,im1G,im1B the color channels of image 1
-/// \param im2R,im2G,im2B the color channels of image 2
+/// \param im1 first image
+/// \param im2 second image
 /// \param gradient1,gradient2 the gradient images
 /// \param d the disparity (layer of the cost volume)
 /// \param param parameters for cost computation
-static Image costLayer(Image im1R, Image im1G, Image im1B,
-                       Image im2R, Image im2G, Image im2B,
+static Image costLayer(Image im1, Image im2,
                        Image gradient1, Image gradient2,
                        int d, const ParamDisparity& param) {
-    const int width=im1R.width(), height=im1R.height();
+    const int width=im1.width(), height=im1.height();
     Image cost(width,height);
     for(int y=0; y<height; y++)
         for(int x=0; x<width; x++) {
@@ -54,11 +67,9 @@ static Image costLayer(Image im1R, Image im1G, Image im1B,
             // Color L1 distance
             if(0<=x+d && x+d<width) {
                 // L1 color distance.
-                float col1[3] = {im1R(x,y), im1G(x,y), im1B(x,y)};
-                float col2[3] = {im2R(x+d,y), im2G(x+d,y), im2B(x+d,y)};
                 costColor = 0;
                 for(int i=0; i<3; i++)
-                    costColor += abs(col1[i]-col2[i]);
+                    costColor += abs(im1(x,y,i)-im2(x+d,y,i));
                 costColor *= 1.0f/3;
                 // Color threshold
                 if(costColor > param.color_threshold)
@@ -77,49 +88,86 @@ static Image costLayer(Image im1R, Image im1G, Image im1B,
     return cost;
 }
 
+/// Compute the cost volume.
+static Image* costVolume(const Image& im1, const Image& im2,
+                         int dMin, int dMax, const ParamDisparity& param) {
+    // Compute x-derivatives of both images
+    Image grad1 = gray(im1).gradX();
+    Image grad2 = gray(im2).gradX();
+
+    // Compute raw matching cost for all disparities.
+    Image* cost = new Image[dMax-dMin+1];
+    for(int d=dMin; d<=dMax; d++)
+        cost[d-dMin] = costLayer(im1, im2, grad1, grad2, d, param);
+    return cost;
+}
+
 /// Fill support weights.
 ///
-/// \param im1R,im1G,im1B The image channels
+/// \param im The image
 /// \param xp,yp Center point
 /// \param r Window radius
 /// \param distC Tabulated color distances
 /// \param distP Tabulated position distances
 /// \param w The output support window
-static void support(const Image& im1R, const Image& im1G, const Image& im1B,
+static void support(const Image& im,
                     int xp, int yp, int r,
                     float* distC, float* distP,
                     Image& w) {
-    const int width=im1R.width(), height=im1R.height();
+    const int width=im.width(), height=im.height(), c=im.channels();
     for(int y=-r; y<=r; y++)
         if(0<=yp+y && yp+y<height)
             for(int x=-r; x<=r; x++)
                 if(0<=xp+x && xp+x<width) {
                     int d=0;
-                    d += std::abs(im1R(xp+x,yp+y)-im1R(xp,yp));
-                    d += std::abs(im1G(xp+x,yp+y)-im1G(xp,yp));
-                    d += std::abs(im1B(xp+x,yp+y)-im1B(xp,yp));
+                    for(int i=0; i<c; i++)
+                        d += std::abs(im(xp+x,yp+y,i)-im(xp,yp,i));
                     w(x+r,y+r)=distC[d]*distP[(y+r)*w.width()+(x+r)];
                 }
 }
 
-/// Adaptive Weights disparity computation
+/// Combined cost of matching points (xp,yp) to (xq,yp).
 ///
-/// The dissimilarity is computed putting adaptative
-/// weights on the raw matching cost
-/// \param im1Color,im2Color the two color images
+/// The support weights of p and q are \a wp and \a wq. The elementary pixel
+/// cost is in image \a cost.
+float costCombined(int xp, int xq, int yp, int r, const Image& wp, const Image&
+#ifndef COMB_LEFT // Unname to avoid warning since unused, if using 'left'
+                   wq
+#endif
+                   , const Image& cost) {
+    const int width = cost.width();
+    float num=0, den=0;
+    for(int y=-r; y<=r; y++)
+        if(0<=yp+y && yp+y<cost.height())
+            for(int x=-r; x<=r; x++)
+                if(0<=xp+x && xp+x<width && 0<=xq+x && xq+x<width) {
+                    float w1=wp(x+r,y+r); // Weight p
+#ifdef COMB_LEFT
+                    float w2=1;
+#else
+                    float w2=wq(x+r,y+r); // Weight q
+#endif
+                    // Combination of weights and raw cost
+                    num+=COMB_WEIGHTS(w1,w2)*cost(xp+x,yp+y);
+                    // normalization term
+                    den+=COMB_WEIGHTS(w1,w2);
+                }
+    return num/den;
+}
+
+/// Adaptive Weights disparity computation.
+///
+/// The dissimilarity is computed putting adaptive weights on the raw cost.
+/// \param im1,im2 the two color images
 /// \param dispMin,dispMax disparity range
-/// \param param cost parameters
+/// \param param raw cost computation parameters
 /// \param disparity1 output disparity map from image 1 to image 2
 /// \param disparity2 output disparity map from image 2 to image 1
-void disparityAW(Image im1Color, Image im2Color,
+void disparityAW(Image im1, Image im2,
                  int dispMin, int dispMax,
                  const ParamDisparity& param,
                  Image& disparity1, Image& disparity2) {
-    // Getting the three color channels (between 0 and 255)
-    Image im1R=im1Color.r(), im1G=im1Color.g(), im1B=im1Color.b();
-    Image im2R=im2Color.r(), im2G=im2Color.g(), im2B=im2Color.b();
-
-    const int width=im1R.width(), height=im1R.height();  // Images dimensions
+    const int width=im1.width(), height=im1.height();  // Images dimensions
     const int r = param.window_radius;                   // window's radius
     const int nd = dispMax-dispMin+1;                    // Disparity range
     std::cout << "Range of disparities: " << nd << " disparities, "<<std::endl;
@@ -138,28 +186,16 @@ void disparityAW(Image im1Color, Image im2Color,
     for(int x=-r; x<=r; x++)
         *d++ = pow(e1,sqrt((float)(x*x+y*y)));
 
-    // Compute x-derivatives of both images
-    Image im1Gray(width,height);
-    Image im2Gray(width,height);
-    rgb_to_gray(&im1R(0,0),&im1G(0,0),&im1B(0,0), width,height, &im1Gray(0,0));
-    rgb_to_gray(&im2R(0,0),&im2G(0,0),&im2B(0,0), width,height, &im2Gray(0,0));
-    Image gradient1 = im1Gray.gradX();
-    Image gradient2 = im2Gray.gradX();
-
-    // Compute raw matching cost for all disparities.
-    Image* cost = new Image[nd];
-    for(int d=dispMin; d<=dispMax; d++) {
-        cost[d-dispMin] = 
-            costLayer(im1R,im1G,im1B, im2R,im2G,im2B, gradient1, gradient2,
-                      d, param);
-    }
+    Image* cost = costVolume(im1, im2, dispMin, dispMax, param);
 
     // Images of dissimilarity 1->2 and 2->1
     Image E1(width,height), E2(width,height);
     std::fill_n(&E1(0,0), width*height, std::numeric_limits<float>::max());
     std::fill_n(&E2(0,0), width*height, std::numeric_limits<float>::max());
 
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
     for(int yp=0; yp<height; yp++) {
         // Image window for the weights in the reference image
         Image weights1(dim,dim);
@@ -171,47 +207,28 @@ void disparityAW(Image im1Color, Image im2Color,
 #ifndef COMB_LEFT
         // Target window weights for all disparities except dispMax
         for(int d=dispMin; d<dispMax; d++)
-            support(im2R, im2G, im2B, 0+d,yp, r, distC, distP,
-                    weights[(0+d-dispMin)%nd]);
+            support(im2, 0+d,yp, r, distC, distP, weights[(0+d-dispMin)%nd]);
 #endif
         for(int xp=0; xp<width; xp++) {
             // Reference window weights
-            support(im1R, im1G, im1B, xp,yp, r, distC, distP, weights1);
+            support(im1, xp,yp, r, distC, distP, weights1);
 #ifndef COMB_LEFT
             // Target window weights at disparity dispMax
-            support(im2R, im2G, im2B, xp+dispMax,yp, r, distC, distP,
+            support(im2, xp+dispMax,yp, r, distC, distP,
                     weights[(xp+dispMax-dispMin)%nd]);
 #endif
             // Compute dissimilarity for all possible disparities
             for(int d=dispMin; d<=dispMax; d++) {
-                // raw matching cost for disparity d
-                const Image& dCost = cost[d-dispMin];
-#ifndef COMB_LEFT
-                // Weights image of target window
-                const Image& weights2 = weights[(xp+d-dispMin)%nd];
-#endif
                 if(0<=xp+d && xp+d<width) {
-                    float num=0, den=0;
-                    for(int y=-r; y<=r; y++)
-                    if(0<=yp+y && yp+y<height)
-                    for(int x=-r; x<=r; x++)
-                    if(0<=xp+x && xp+x<width && 0<=xp+x+d && xp+x+d<width) {
-                        // Weight p in the left image
-                        float w1=weights1(x+r,y+r);
-                        // Weight q in the right image
-#ifdef COMB_LEFT
-                        float w2=1;
-#else
-                        float w2=weights2(x+r,y+r);
-#endif
-                        // Combination of weights and raw cost
-                        num+=COMB_WEIGHTS(w1,w2)*dCost(xp+x,yp+y);
-                        // normalization term
-                        den+=COMB_WEIGHTS(w1,w2);
-                    }
-                    // Dissimilarity for this disparity
-                    float E=num/den;
+                    const Image& c = cost[d-dispMin]; // raw cost for disp. d
+#ifdef COMB_LEFT // Weights of target window
 
+                    const Image& weights2 = weights1; // Unused
+#else
+                    const Image& weights2 = weights[(xp+d-dispMin)%nd];
+#endif
+                    float E = costCombined(xp, xp+d, yp, r,
+                                           weights1, weights2, c);
                     // Winner takes all label selection
                     if(E1(xp,yp) > E) {
                         E1(xp,yp) = E;

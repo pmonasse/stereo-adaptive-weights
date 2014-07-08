@@ -27,6 +27,7 @@
 /// line above \a vMin. The filling value is the result of \a cmp with the two
 /// values as parameters.
 void Image::fillX(float vMin, const float& (*cmp)(const float&,const float&)) {
+    assert(c==1);
     for(int y=0; y<h; y++) {
         int x0=-1;
         float v0 = vMin;
@@ -56,7 +57,7 @@ void Image::fillMaxX(float vMin) {
 
 /// Derivative along x-axis
 Image Image::gradX() const {
-    assert(w>=2);
+    assert(w>=2 && c==1);
     Image D(w,h);
     float* out=D.tab;
     for(int y=0; y<h; y++) {
@@ -69,71 +70,25 @@ Image Image::gradX() const {
     return D;
 }
 
-/// Averaging filter with box of \a radius
-Image Image::boxFilter(int radius) const {
-    Image tmp(clone());
-
-    //cumulative sum table
-    for(int y=0; y<h; y++) { //horizontal
-        float *in=tmp.tab+y*w, *out=in+1;
-        for(int x=1; x<w; x++)
-            *out++ += *in++;
-    }
-    for(int y=1; y<h; y++) { //vertical
-        float *in=tmp.tab+(y-1)*w, *out=in+w;
-        for(int x=0; x<w; x++)
-            *out++ += *in++;
-    }
-
-    //box filter
-    Image B(w,h);
-    //cumulative sum table
-    float *out=B.tab;
-    for(int y=0; y<h; y++) {
-        int ymin = std::max(-1, y-radius-1);
-        int ymax = std::min(h-1, y+radius);
-        for(int x=0; x<w; x++, out++) {
-            int xmin = std::max(-1, x-radius-1);
-            int xmax = std::min(w-1, x+radius);
-            *out = tmp(xmax,ymax);
-            if(xmin>=0)
-                *out -= tmp(xmin,ymax);
-            if(ymin>=0)
-                *out -= tmp(xmax,ymin);
-            if(xmin>=0 && ymin>=0)
-                *out += tmp(xmin,ymin);
-            *out /= (xmax-xmin)*(ymax-ymin);
-        }
-    }
-    return B;
-}
-
 /// Median filter, write results in \a M
-void Image::median(int radius, Image& M) const {
+Image Image::median(int radius) const {
+    Image M(w,h,c);
     int size=2*radius+1;
     size *= size;
     float* v = new float[size];
     for(int y=0; y<h; y++)
-        for(int x=0; x<w; x++) {
-            int n=0;
-            for(int j=-radius; j<=radius; j++)
-                if(0<=j+y && j+y<h)
-                    for(int i=-radius; i<=radius; i++)
-                        if(0<=i+x && i+x<w)
-                            v[n++] = (*this)(i+x,j+y);
-            std::nth_element(v, v+n/2, v+n);
-            M(x,y) = v[n/2];
-        }
+        for(int x=0; x<w; x++)
+            for(int k=0; k<c; k++) {
+                int n=0;
+                for(int j=-radius; j<=radius; j++)
+                    if(0<=j+y && j+y<h)
+                        for(int i=-radius; i<=radius; i++)
+                            if(0<=i+x && i+x<w)
+                                v[n++] = (*this)(i+x,j+y,k);
+                std::nth_element(v, v+n/2, v+n);
+                M(x,y,k) = v[n/2];
+            }
     delete [] v;
-}
-
-/// Median filter for a color image
-Image Image::medianColor(int radius) const {
-    Image M(w,3*h);
-    M.h=h;
-    Image I=M.r(); r().median(radius, I);
-    I=M.g(); g().median(radius, I);
-    I=M.b(); b().median(radius, I);
     return M;
 }
 
@@ -143,10 +98,11 @@ inline float sqr(float v1) {
 }
 
 /// Square L2 distance between colors at (x1,y1) and at (x2,y2)
-float Image::dist2Color(int x1,int y1, int x2,int y2) const {
-    return sqr((*this)(x1,y1    )-(*this)(x2,y2    ))+
-           sqr((*this)(x1,y1+  h)-(*this)(x2,y2+  h))+
-           sqr((*this)(x1,y1+2*h)-(*this)(x2,y2+2*h));
+float Image::dist2(int x1,int y1, int x2,int y2) const {
+    float d=0;
+    for(int i=0; i<c; i++)
+        d += sqr((*this)(x1,y1,i)-(*this)(x2,y2,i));
+    return d;
 }
 
 /// @brief Compute weighted histogram of image values.
@@ -165,7 +121,7 @@ void Image::weighted_histo(std::vector<float>& tab, int x, int y, int radius,
                 if(0<=x+dx && x+dx<w) {
                     float w =
                         exp(-(dx*dx+dy*dy)*sSpace
-                            -guidance.dist2Color(x,y,x+dx,y+dy)*sColor);
+                            -guidance.dist2(x,y,x+dx,y+dy)*sColor);
                     tab[(int)((*this)(x+dx,y+dy))-vMin] += w;
                 }
 }
@@ -181,13 +137,13 @@ static int median_histo(const std::vector<float>& tab) {
 
 /// @brief Weighted median filter of current image.
 ///
-/// Image is assumed to have integer values in [vMin,vMax]. Weight are computed
+/// Image is assumed to have integer values in [vMin,vMax]. Weights are computed
 /// as in bilateral filter in color image \a guidance. Only pixels of image
 /// \a where outside [vMin,vMax] are filtered.
-Image Image::weightedMedianColor(const Image& guidance,
-                                 const Image& where, int vMin, int vMax,
-                                 int radius, float sSpace, float sColor) const
-{
+Image Image::weightedMedian(const Image& guidance,
+                            const Image& where, int vMin, int vMax,
+                            int radius, float sSpace, float sColor) const {
+    assert(where.c==1);
     sSpace = 1.0f/(sSpace*sSpace);
     sColor = 1.0f/(sColor*sColor);
 
@@ -200,7 +156,7 @@ Image Image::weightedMedianColor(const Image& guidance,
 #endif
     for(int y=0; y<h; y++)
         for(int x=0; x<w; x++) {
-            if(where(x,y)>=vMin) {
+            if(vMin<=where(x,y) && where(x,y)<=vMax) {
                 M(x,y)=(*this)(x,y);
                 continue;
             }

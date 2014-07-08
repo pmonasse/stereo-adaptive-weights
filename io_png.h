@@ -21,9 +21,7 @@ float *io_png_read_f32_gray(const char *fname, size_t *nxp, size_t *nyp);
 int io_png_write_u8(const char *fname, const unsigned char *data, size_t nx, size_t ny, size_t nc);
 int io_png_write_f32(const char *fname, const float *data, size_t nx, size_t ny, size_t nc);
 
-void rgb_to_gray(const float *ptr_r, const float *ptr_g, const float *ptr_b,
-                 size_t nxp, size_t nyp,
-                 float *ptr_gray);
+float rgb_to_gray(float r, float g, float b);
 
 #ifdef __cplusplus
 }

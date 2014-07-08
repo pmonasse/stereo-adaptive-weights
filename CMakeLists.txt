@@ -15,7 +15,6 @@ set(SRC2
     cmdLine.h
     image.cpp image.h
     io_png.c io_png.h
-    main2.cpp
     show_weights.cpp)
 
 add_executable(stereoAdaptiveWeights ${SRC})

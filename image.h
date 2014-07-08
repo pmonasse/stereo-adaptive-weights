@@ -26,16 +26,16 @@
 /// To perform a deep copy, use method clone().
 /// There is a constructor taking array of pixels; no copy is done, make sure
 /// the array exists during the lifetime of the image.
-/// The methods using color image assume consecutive channels (no interlace).
+/// The channels of a color image are interlaced, meaning RGBRGB...
 class Image {
-    int* count;
-    float* tab;
-    int w, h;
+    int* count; ///< number of shallow copies
+    float* tab; ///< array of pixels
+    int w, h, c; ///< width, height, channels
     void kill();
 public:
     Image();
-    Image(int width, int height);
-    Image(float* pix, int width, int height);
+    Image(int width, int height, int channels=1);
+    Image(float* pix, int width, int height, int channels=1);
     Image(const Image& I);
     ~Image() { kill(); }
     Image& operator=(const Image& I);
@@ -43,27 +43,22 @@ public:
 
     int width() const { return w; }
     int height() const { return h; }
-    float  operator()(int i,int j) const { return tab[j*w+i]; }
-    float& operator()(int i,int j)       { return tab[j*w+i]; }
-
-    Image r() const { return Image(tab+0*w*h,w,h); }
-    Image g() const { return Image(tab+1*w*h,w,h); }
-    Image b() const { return Image(tab+2*w*h,w,h); }
+    int channels() const { return c; }
+    float  operator()(int i,int j,int d=0) const { return tab[(j*w+i)*c+d]; }
+    float& operator()(int i,int j,int d=0)       { return tab[(j*w+i)*c+d]; }
 
     // Filters (implemented in filters.cpp)
     Image gradX() const;
     void fillMinX(float vMin);
     void fillMaxX(float vMin);
-    Image boxFilter(int radius) const;
-    void median(int radius, Image& M) const;
-    Image medianColor(int radius) const;
-    Image weightedMedianColor(const Image& guidance,
-                              const Image& where, int vMin, int vMax,
-                              int radius,
-                              float sigmaSpace, float sigmaColor) const;
+    Image median(int radius) const;
+    Image weightedMedian(const Image& guidance,
+                         const Image& where, int vMin, int vMax,
+                         int radius,
+                         float sigmaSpace, float sigmaColor) const;
 private:
     void fillX(float vMin, const float& (*cmp)(const float&,const float&));
-    float dist2Color(int x1,int y1, int x2,int y2) const;
+    float dist2(int x1,int y1, int x2,int y2) const;
     void weighted_histo(std::vector<float>& tab, int x, int y, int radius,
                         float vMin, const Image& guidance,
                         float sSpace, float sColor) const;

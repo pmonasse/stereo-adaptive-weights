@@ -480,7 +480,7 @@ float *io_png_read_f32_rgb(const char *fname, size_t * nxp, size_t * nyp)
 float *io_png_read_f32_gray(const char *fname, size_t * nxp, size_t * nyp)
 {
     size_t nc;
-    float *img;
+    float *img, *ptr_gray, *ptr_end, *ptr_r, *ptr_g, *ptr_b;
 
     /* read the image */
     img = (float *) io_png_read_raw(fname, nxp, nyp, &nc,
@@ -493,8 +493,12 @@ float *io_png_read_f32_gray(const char *fname, size_t * nxp, size_t * nyp)
         return img;
     else
     {
-        rgb_to_gray(img, img + *nxp * *nyp, img + 2 * *nxp * *nyp,
-                    *nxp, *nyp, img);
+        ptr_r = img + 0 * *nxp * *nyp;
+        ptr_g = img + 1 * *nxp * *nyp;
+        ptr_b = img + 2 * *nxp * *nyp;
+        ptr_gray = ptr_r; ptr_end = ptr_g;
+        while (ptr_gray < ptr_end)
+            *ptr_gray++ = rgb_to_gray(*ptr_r++, *ptr_g++, *ptr_b++);
         /* resize and return the image */
         img = realloc(img, *nxp * *nyp * sizeof(float));
         return img;
@@ -741,17 +745,9 @@ int io_png_write_f32(const char *fname, const float *data,
  * integer approximation of
  * Y = 0.212671 * R + 0.715160 * G + 0.072169 * B
  *
- * @param ptr_r,ptr_g,ptr_b red, green and blue channels
- * @param nxp,nyp number of columns and lines of the image
- * @param ptr_gray output gray channel (can be pointer to one input channel)
+ * @param r,g,b red, green and blue channels
  */
-void rgb_to_gray(const float *ptr_r, const float *ptr_g, const float *ptr_b,
-                 size_t nxp, size_t nyp,
-                 float *ptr_gray)
+float rgb_to_gray(float r, float g, float b)
 {
-        float *ptr_end = ptr_gray + nxp * nyp;
-        while (ptr_gray < ptr_end)
-            *ptr_gray++ = (float) (6969 * *ptr_r++
-                                   + 23434 * *ptr_g++
-                                   + 2365 * *ptr_b++) / 32768;
+    return (float) (6969 * r + 23434 * g + 2365 * b) / 32768;
 }

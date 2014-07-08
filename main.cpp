@@ -59,6 +59,26 @@ static void usage(const char* name) {
               << std::endl;
 }
 
+/// Load color image
+Image loadImage(const char* name) {
+    size_t width, height;
+    float* pix = io_png_read_f32_rgb(name, &width, &height);
+    if(! pix) {
+        std::cerr << "Unable to read file " << name << " as PNG" << std::endl;
+        std::exit(1);
+    }
+    const int w=static_cast<int>(width), h=static_cast<int>(height);
+    Image im(w, h, 3);
+    const float *r=pix, *g=r+w*h, *b=g+w*h;
+    for(int y=0; y<h; y++)
+        for(int x=0; x<w; x++) {
+            im(x,y,0) = *r++;
+            im(x,y,1) = *g++;
+            im(x,y,2) = *b++;
+        }
+    std::free(pix);
+    return im;
+}
 
 /// Main program
 int main(int argc, char *argv[])
@@ -106,15 +126,13 @@ int main(int argc, char *argv[])
     }
 
     // Load images
-    size_t width, height, width2, height2;
-    float* pix1 = io_png_read_f32_rgb(argv[1], &width, &height);
-    float* pix2 = io_png_read_f32_rgb(argv[2], &width2, &height2);
-    if(width != width2 || height != height2) {
+    Image im1 = loadImage(argv[1]);
+    Image im2 = loadImage(argv[2]);
+    const int width=im1.width(), height=im1.height();
+    if(width!=im2.width() || height!=im2.height()) {
         std::cerr << "The images must have the same size!" << std::endl;
         return 1;
     }
-    Image im1(pix1, width, height);
-    Image im2(pix2, width, height);
 
     // Set disparity range
     int dMin, dMax;
@@ -156,15 +174,11 @@ int main(int argc, char *argv[])
         dispDense.fillMinX(dMin);
 
     std::cout << "Post-processing: smooth the disparity map" << std::endl;
-    fill_occlusion(dispDense, im1.medianColor(1),disparity, dMin, dMax, paramOcc);
+    fill_occlusion(dispDense, im1.median(1), disparity, dMin, dMax, paramOcc);
     if(! save_disparity(OUTFILE2, disparity, dMin,dMax, grayMin,grayMax)) {
         std::cerr << "Error writing file " << OUTFILE2 << std::endl;
         return 1;
     }
-
-    // free space
-    free(pix1);
-    free(pix2);
 
     return 0;
 }

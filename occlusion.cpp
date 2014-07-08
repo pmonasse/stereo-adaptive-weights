@@ -43,9 +43,9 @@ void detect_occlusion(Image& disparityLeft, const Image& disparityRight,
 void fill_occlusion(const Image& dispDense, const Image& guidance,
                     Image& disparity, int dispMin, int dispMax,
                     const ParamOcclusion& paramOcc) {
-    disparity = dispDense.weightedMedianColor(guidance,
-                                              disparity, dispMin, dispMax,
-                                              paramOcc.median_radius,
-                                              paramOcc.sigma_space,
-                                              paramOcc.sigma_color);
+    disparity = dispDense.weightedMedian(guidance,
+                                         disparity, dispMin, dispMax,
+                                         paramOcc.median_radius,
+                                         paramOcc.sigma_space,
+                                         paramOcc.sigma_color);
 }

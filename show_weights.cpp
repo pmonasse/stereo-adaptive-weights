@@ -5,146 +5,185 @@
  *         Pascal Monasse <monasse@imagine.enpc.fr>
  */
 
-
+#include "disparity.h"
 #include "image.h"
+#include "cmdLine.h"
 #include "io_png.h"
-#include <iostream>
 #include <algorithm>
+#include <iostream>
 #include <cmath>
 
+/// Type for weights combination
+typedef float (*Comb)(float,float);
 
-/// Compute weights of a window.
-///
-/// Computes the Yoon-Kweon adaptive weights for a window of the
-/// input image and stores them in a grey image.
-static void show_weights(char* input,       // input image name
-						 int xp, int yp,    // window's center coordinates
-                         int radius,        // window's radius
-                         float gamma_s,     // color similarity parameter
-                         float gamma_p,     // distance parameter
-						 char* output)      // output image name
-{
-
-    // load the input image
-    size_t w, h;
-    float* pix = io_png_read_f32_rgb(input, &w, &h);
-    Image im(pix, w, h);
-    Image imR=im.r(), imG=im.g(), imB=im.b();
-
-    float inr,ing,inb;
-    float distS,distP;
-
-    // create weight images
-	Image weights(2*radius+1,2*radius+1);
-	std::fill_n(&weights(0,0), (2*radius+1)*(2*radius+1), 0);
-
-    // Compute weights
-    for(int y=0; y<(int)h; y++)
-        if(yp-radius<=y && y<=yp+radius)
-            for (int x=0; x<(int)w; x++)
-                if(xp-radius<=x && x<=xp+radius) {
-
-                    // color difference (L1)
-                    inr=abs(imR(x,y)-imR(xp,yp));
-                    ing=abs(imG(x,y)-imG(xp,yp));
-                    inb=abs(imB(x,y)-imB(xp,yp));
-                    distS=inr+ing+inb;
-					distS/=3;
-
-                    // space difference (L2)
-                    distP=(x-xp)*(x-xp)+(y-yp)*(y-yp);
-                    distP=sqrt(distP);
-
-                    // total weight
-                    weights(x-xp+radius,y-yp+radius)=exp(-distS/gamma_s)*exp(-distP/gamma_p);
-                }
-
-    w=2*radius+1;
-	h=w;
-    const float* in=&(const_cast<Image&>(weights))(0,0);
-    unsigned char *out = new unsigned char[3*w*h];
-    unsigned char *red=out, *green=out+w*h, *blue=out+2*w*h;
-    float maxim = weights(radius,radius);
-    for(size_t i=w*h; i>0; i--, in++, red++) {
-        float v = (255./maxim)* *in ;
-        if(v<0) v=0;
-        if(v>255) v=255;
-        *red = static_cast<unsigned char>(v);
-        *green++ = *red;
-        *blue++  = *red;
-    }
-    io_png_write_u8(output, out, w, h, 3);
+/// The std::max and std::min functions take arguments float&, not float.
+/// We need to encapsulate them for parameter compatibility.
+static float max(float a, float b) {
+    return std::max(a,b);
+}
+static float min(float a, float b) {
+    return std::min(a,b);
+}
+static float mult(float a, float b) {
+    return a*b;
+}
+static float plus(float a, float b) {
+    return a+b;
 }
 
+/// Usage Description
+static void usage(const char* name) {
+    ParamDisparity p; // Parameters for adaptive weights
+	std::cerr <<"Show weights\n"
+              << "Usage: " << name
+              << " [options] im1.png x y out.png [im2.png disp]\n"
+              << "Options (default values in parentheses)\n"
+              << "Adaptive weights parameters:\n"
+              << "    -R radius: radius of the window patch ("
+              <<p.window_radius << ")\n"
+              << "    --gcol gamma_s: gamma for color similarity ("
+              <<p.gamma_s << ")\n"
+              << "    --gpos gamma_p: gamma for distance ("
+              <<p.gamma_p << ")\n"
+              << "    -c: weights combination (mult)\n\n"
+              << "Weights combination choice (relevant only with im2.png):\n"
+              << "    - 'max': max(w1,w2)\n"
+              << "    - 'min': min(w1,w2)\n"
+              << "    - 'mult': w1*w2\n"
+              << "    - 'plus': w1+w2"
+              << std::endl;
+}
 
-/// Compute combined weights of two windows.
-///
-/// Computes the Yoon-Kweon adaptive weights for a window in the reference image
-/// and the window corresponding to disparity \a disp in the target window
-/// combines them and stores them in a grey image.
-static void show_weights2(char* input,   // input image name
-                         char* input2,    // 2nd input image name
-						 int xp, int yp,  // window's center coordinates in the ref. image
-                         int radius,      // window's radius
-                         float gamma_s,   // color similarity parameter
-                         float gamma_p,   // distance parameter
-						 char* output,    // output image name
-						 int disp)		  // disparity value to combine the two windows
-{
-    // load the input images
-    size_t w, h, w2, h2;
-    float* pix=io_png_read_f32_rgb(input,&w,&h);
-    float* pix2=io_png_read_f32_rgb(input2,&w2,&h2);
-    Image im(pix, w, h), im2(pix2, w2, h2);
-    Image imR=im.r(), imG=im.g(), imB=im.b(), imR2=im2.r(), imG2=im2.g(), imB2=im2.b();
-
-    float inr,ing,inb,inr2,ing2,inb2;
-    float distS,distP,distS2;
-
-    // create weight images
-	Image weights(2*radius+1,2*radius+1);
-	std::fill_n(&weights(0,0), (2*radius+1)*(2*radius+1), 0);
-
-    // Compute weights
-    for(int y=0; y<(int)h; y++)
-        if(yp-radius<=y && y<=yp+radius)
-            for (int x=0; x<(int)w; x++)
-                if(xp-radius<=x && x<=xp+radius) {
-
-                    // color difference (L1)
-                    inr=abs(imR(x,y)-imR(xp,yp));
-                    ing=abs(imG(x,y)-imG(xp,yp));
-                    inb=abs(imB(x,y)-imB(xp,yp));
-                    distS=inr+ing+inb;
-					distS/=3;
-
-					inr2=abs(imR2(x+disp,y)-imR2(xp+disp,yp));
-                    ing2=abs(imG2(x+disp,y)-imG2(xp+disp,yp));
-                    inb2=abs(imB2(x+disp,y)-imB2(xp+disp,yp));
-                    distS2=inr2+ing2+inb2;
-					distS2/=3;
-
-                    // space difference (L2)
-                    distP=(x-xp)*(x-xp)+(y-yp)*(y-yp);
-                    distP=sqrt(distP);
-
-                    // total weights combining the two windows
-                    weights(x-xp+radius,y-yp+radius)=exp(-(distS+distS2)/gamma_s)*exp(-2*distP/gamma_p);
-                }
-
-    w=2*radius+1;
-	h=w;
-    const float* in=&(const_cast<Image&>(weights))(0,0);
-    unsigned char *out = new unsigned char[3*w*h];
-    unsigned char *red=out, *green=out+w*h, *blue=out+2*w*h;
-    float maxim = weights(radius,radius);
-    for(size_t i=w*h; i>0; i--, in++, red++) {
-        float v = (255./maxim)* *in ;
-        if(v<0) v=0;
-        if(v>255) v=255;
-        *red = static_cast<unsigned char>(v);
-        *green++ = *red;
-        *blue++  = *red;
+/// Load color image
+Image loadImage(const char* name) {
+    size_t width, height;
+    float* pix = io_png_read_f32_rgb(name, &width, &height);
+    if(! pix) {
+        std::cerr << "Unable to read file " << name << " as PNG" << std::endl;
+        std::exit(1);
     }
-    io_png_write_u8(output, out, w, h, 3);
+    const int w=static_cast<int>(width), h=static_cast<int>(height);
+    Image im(w, h, 3);
+    const float *r=pix, *g=r+w*h, *b=g+w*h;
+    for(int y=0; y<h; y++)
+        for(int x=0; x<w; x++) {
+            im(x,y,0) = *r++;
+            im(x,y,1) = *g++;
+            im(x,y,2) = *b++;
+        }
+    std::free(pix);
+    return im;
+}
+
+/// Compute the window of weights around pixel (xp,yp) in \a im1.
+Image show_weights(const Image& im1, const Image& im2, int xp, int yp, int xq,
+                   Comb* comb, int r, float gamma_s, float gamma_p) {
+    Image W(2*r+1,2*r+1);
+    std::fill_n(&W(0,0), W.width()*W.height(), 0);
+    int w1=im1.width(), h1=im1.height(), c1=im1.channels();
+    int w2=im2.width(), h2=im2.height(), c2=im2.channels();
+    for(int y=-r; y<=r; y++)
+        if(0<=yp+y && yp+y<h1 && (!comb || yp+y<h2))
+            for(int x=-r; x<=r; x++)
+                if(0<=xp+x && xp+x<w1 &&
+                   (!comb || (0<=xq+x && xq+x<w2))) {
+                    int d=0;
+                    for(int i=0; i<c1; i++)
+                        d += std::abs(im1(xp+x,yp+y,i)-im1(xp,yp,i));
+                    W(x+r,y+r) =
+                        std::exp(-d/(c1*gamma_s)) *
+                        std::exp(-std::sqrt(x*x+y*y)/gamma_p);
+                    if(comb) {
+                        d=0;
+                        for(int i=0; i<c2; i++)
+                            d += std::abs(im2(xq+x,yp+y,i)-im2(xq,yp,i));
+                        float w1 = W(x+r,y+r);
+                        W(x+r,y+r) = (*comb)
+                            (w1,
+                             std::exp(-d/(c2*gamma_s)) *
+                             std::exp(-std::sqrt(x*x+y*y)/gamma_p));
+                    }
+                }
+    return W;
+}
+
+/// Rescale weights to interval [0,255]
+void rescale(Image& w) {
+    float f = 255.0f / w(w.width()/2,w.height()/2); // Max value at the middle
+    for(int y=0; y<w.height(); y++)
+        for(int x=0; x<w.width(); x++) {
+            float v = f*w(x,y);
+            if(v<0) v = 0;
+            if(v>255.0f) v = 255.0f;
+            w(x,y) = v;
+        }
+}
+
+/// Main Program
+int main(int argc, char *argv[])
+{
+	CmdLine cmd;
+
+    std::string combine;
+    ParamDisparity p; // Parameters for adaptive weights
+    cmd.add( make_option('R',p.window_radius) );
+    cmd.add( make_option(0,p.gamma_s,"gcol") );
+    cmd.add( make_option(0,p.gamma_p,"gpos") );
+	cmd.add( make_option('c', combine) );
+
+	try {
+		cmd.process(argc, argv);
+	} catch(std::string str) {
+		std::cerr << "Error: " << str << std::endl<<std::endl;
+        argc = 1; // To display usage
+	}
+	if(argc!=5 && argc!=7) {
+		usage(argv[0]);
+		return 1;
+	}
+
+    // Load images
+    Image im1 = loadImage(argv[1]);
+    Image im2;
+    if(argc>5)
+        im2 = loadImage(argv[5]);
+
+	int x,y;
+	if(! ((std::istringstream(argv[2])>>x).eof() &&
+		  (std::istringstream(argv[3])>>y).eof())) {
+        std::cerr << "Error reading x or y" << std::endl;
+        return 1;
+	}
+
+	int disp=0;
+	if(argc>6 && !((std::istringstream(argv[6])>>disp).eof()) ) {
+        std::cerr << "Error reading disparity" << std::endl;
+        return 1;
+	}
+
+    Comb* comb=0;
+    if(cmd.used('c') && im2.channels()!=0)
+        if(combine == "max")
+            comb = new Comb(max);
+        else if(combine == "min")
+            comb = new Comb(min);
+        else if(combine == "mult")
+            comb = new Comb(mult);
+        else if(combine == "plus")
+            comb = new Comb(plus);
+        else {
+            std::cerr << "Unrecognized option for weights combination "
+                      << "(should be max,min,mult or plus)" << std::endl;
+            return 1;
+        }
+
+    Image w = show_weights(im1, im2, x, y, x+disp, comb,
+                           p.window_radius, p.gamma_s, p.gamma_p);
+    rescale(w);
+    if(io_png_write_f32(argv[4], &w(0,0), w.width(), w.height(), 1) != 0) {
+        std::cerr << "Unable to write file " << argv[4] << std::endl;
+        return 1;
+    }
+
+	return 0;
 }

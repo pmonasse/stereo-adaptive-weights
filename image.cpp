@@ -24,21 +24,22 @@
 ///
 /// The main interest of this one is to allow arrays of Image.
 Image::Image()
-: count(0), tab(0), w(0), h(0) {}
+: count(0), tab(0), w(0), h(0), c(0) {}
 
 /// Constructor
-Image::Image(int width, int height)
-: count(new int(1)), tab(new float[width*height]), w(width), h(height) {}
+Image::Image(int width, int height, int channels)
+: count(new int(1)), tab(new float[width*height*channels]),
+  w(width), h(height), c(channels) {}
 
 /// Constructor with array of pixels.
 ///
 /// Make sure it is not deleted during the lifetime of the image.
-Image::Image(float* pix, int width, int height)
-: count(0), tab(pix), w(width), h(height) {}
+Image::Image(float* pix, int width, int height, int channels)
+: count(0), tab(pix), w(width), h(height), c(channels) {}
 
 /// Copy constructor (shallow copy)
 Image::Image(const Image& I)
-: count(I.count), tab(I.tab), w(I.w), h(I.h) {
+: count(I.count), tab(I.tab), w(I.w), h(I.h), c(I.c) {
     if(count)
         ++*count;
 }
@@ -50,14 +51,14 @@ Image& Image::operator=(const Image& I) {
         if(I.count)
             ++*I.count;
     }
-    count=I.count; tab=I.tab; w=I.w; h=I.h;
+    count=I.count; tab=I.tab; w=I.w; h=I.h; c=I.c;
     return *this;
 }
 
 /// Deep copy
 Image Image::clone() const {
-    Image I(w,h);
-    std::copy(tab, tab+w*h, I.tab);
+    Image I(w,h,c);
+    std::copy(tab, tab+w*h*c, I.tab);
     return I;
 }
 
