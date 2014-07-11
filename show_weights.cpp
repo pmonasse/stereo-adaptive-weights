@@ -41,8 +41,8 @@ static void usage(const char* name) {
               << "Adaptive weights parameters:\n"
               << "    -R radius: radius of the window patch ("
               <<p.window_radius << ")\n"
-              << "    --gcol gamma_s: gamma for color similarity ("
-              <<p.gamma_s << ")\n"
+              << "    --gcol gamma_c: gamma for color similarity ("
+              <<p.gamma_c << ")\n"
               << "    --gpos gamma_p: gamma for distance ("
               <<p.gamma_p << ")\n"
               << "    -c: weights combination (mult)\n\n"
@@ -77,7 +77,7 @@ Image loadImage(const char* name) {
 
 /// Compute the window of weights around pixel (xp,yp) in \a im1.
 Image show_weights(const Image& im1, const Image& im2, int xp, int yp, int xq,
-                   Comb* comb, int r, float gamma_s, float gamma_p) {
+                   Comb* comb, int r, float gamma_c, float gamma_p) {
     Image W(2*r+1,2*r+1);
     std::fill_n(&W(0,0), W.width()*W.height(), 0);
     int w1=im1.width(), h1=im1.height(), c1=im1.channels();
@@ -91,7 +91,7 @@ Image show_weights(const Image& im1, const Image& im2, int xp, int yp, int xq,
                     for(int i=0; i<c1; i++)
                         d += std::abs(im1(xp+x,yp+y,i)-im1(xp,yp,i));
                     W(x+r,y+r) =
-                        std::exp(-d/(c1*gamma_s)) *
+                        std::exp(-d/(c1*gamma_c)) *
                         std::exp(-std::sqrt(x*x+y*y)/gamma_p);
                     if(comb) {
                         d=0;
@@ -100,7 +100,7 @@ Image show_weights(const Image& im1, const Image& im2, int xp, int yp, int xq,
                         float w1 = W(x+r,y+r);
                         W(x+r,y+r) = (*comb)
                             (w1,
-                             std::exp(-d/(c2*gamma_s)) *
+                             std::exp(-d/(c2*gamma_c)) *
                              std::exp(-std::sqrt(x*x+y*y)/gamma_p));
                     }
                 }
@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
     std::string combine;
     ParamDisparity p; // Parameters for adaptive weights
     cmd.add( make_option('R',p.window_radius) );
-    cmd.add( make_option(0,p.gamma_s,"gcol") );
+    cmd.add( make_option(0,p.gamma_c,"gcol") );
     cmd.add( make_option(0,p.gamma_p,"gpos") );
 	cmd.add( make_option('c', combine) );
 
@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
         }
 
     Image w = show_weights(im1, im2, x, y, x+disp, comb,
-                           p.window_radius, p.gamma_s, p.gamma_p);
+                           p.window_radius, p.gamma_c, p.gamma_p);
     rescale(w);
     if(io_png_write_f32(argv[4], &w(0,0), w.width(), w.height(), 1) != 0) {
         std::cerr << "Unable to write file " << argv[4] << std::endl;

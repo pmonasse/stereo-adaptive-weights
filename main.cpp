@@ -29,7 +29,7 @@ static void usage(const char* name) {
               << "Options (default values in parentheses)\n"
               << "Adaptive weights parameters:\n"
               << "    --gcol gamma_col: gamma for color difference ("
-              <<p.gamma_s<<")\n"
+              <<p.gamma_c<<")\n"
               << "    --gpos gamma_pos: gamma for spatial distance ("
               <<p.gamma_p<<")\n"
               << "    -R radius: radius of patch window ("
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
     cmd.add( make_option('A',paramD.alpha) );
     cmd.add( make_option('t',paramD.color_threshold) );
     cmd.add( make_option('g',paramD.gradient_threshold) );
-    cmd.add( make_option(0,paramD.gamma_s,"gcol") );
+    cmd.add( make_option(0,paramD.gamma_c,"gcol") );
     cmd.add( make_option(0,paramD.gamma_p,"gpos") );
 
     ParamOcclusion paramOcc; // Parameters for filling occlusions

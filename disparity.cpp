@@ -174,7 +174,7 @@ void disparityAW(Image im1, Image im2,
 
     // Tabulated proximity weights (color distance)
     float* distC = new float[3*255+1];
-    float e2=exp(-1/(3*param.gamma_s));
+    float e2=exp(-1/(3*param.gamma_c));
     for(int x=0; x<=3*255; x++)
         distC[x] = pow(e2,x);
 
