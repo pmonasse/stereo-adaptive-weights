@@ -10,7 +10,6 @@
 #include "io_png.h"
 #include <algorithm>
 #include <limits>
-#include <iostream>
 #include <vector>
 #include <cmath>
 #include <cassert>
@@ -56,7 +55,8 @@ Image gray(const Image& in) {
 static Image costLayer(Image im1, Image im2,
                        Image gradient1, Image gradient2,
                        int d, const ParamDisparity& param) {
-    const int width=im1.width(), height=im1.height();
+    assert(im1.channels() == im2.channels());
+    const int width=im1.width(), height=im1.height(), channels=im1.channels();
     Image cost(width,height);
     for(int y=0; y<height; y++)
         for(int x=0; x<width; x++) {
@@ -68,9 +68,9 @@ static Image costLayer(Image im1, Image im2,
             if(0<=x+d && x+d<width) {
                 // L1 color distance.
                 costColor = 0;
-                for(int i=0; i<3; i++)
+                for(int i=0; i<channels; i++)
                     costColor += abs(im1(x,y,i)-im2(x+d,y,i));
-                costColor *= 1.0f/3;
+                costColor /= (float)channels;
                 // Color threshold
                 if(costColor > param.color_threshold)
                     costColor = param.color_threshold;
@@ -110,10 +110,8 @@ static Image* costVolume(const Image& im1, const Image& im2,
 /// \param distC Tabulated color distances
 /// \param distP Tabulated position distances
 /// \param w The output support window
-static void support(const Image& im,
-                    int xp, int yp, int r,
-                    float* distC, float* distP,
-                    Image& w) {
+static void support(const Image& im, int xp, int yp, int r,
+                    float* distC, float* distP, Image& w) {
     const int width=im.width(), height=im.height(), c=im.channels();
     for(int y=-r; y<=r; y++)
         if(0<=yp+y && yp+y<height)
@@ -130,11 +128,8 @@ static void support(const Image& im,
 ///
 /// The support weights of p and q are \a wp and \a wq. The elementary pixel
 /// cost is in image \a cost.
-float costCombined(int xp, int xq, int yp, int r, const Image& wp, const Image&
-#ifndef COMB_LEFT // Unname to avoid warning since unused, if using 'left'
-                   wq
-#endif
-                   , const Image& cost) {
+float costCombined(int xp, int xq, int yp, int r,
+                   const Image& wp, const Image& wq, const Image& cost) {
     const int width = cost.width();
     float num=0, den=0;
     for(int y=-r; y<=r; y++)
@@ -142,11 +137,7 @@ float costCombined(int xp, int xq, int yp, int r, const Image& wp, const Image&
             for(int x=-r; x<=r; x++)
                 if(0<=xp+x && xp+x<width && 0<=xq+x && xq+x<width) {
                     float w1=wp(x+r,y+r); // Weight p
-#ifdef COMB_LEFT
-                    float w2=1;
-#else
                     float w2=wq(x+r,y+r); // Weight q
-#endif
                     // Combination of weights and raw cost
                     num+=COMB_WEIGHTS(w1,w2)*cost(xp+x,yp+y);
                     // normalization term
@@ -161,30 +152,34 @@ float costCombined(int xp, int xq, int yp, int r, const Image& wp, const Image&
 /// \param im1,im2 the two color images
 /// \param dispMin,dispMax disparity range
 /// \param param raw cost computation parameters
-/// \param disparity1 output disparity map from image 1 to image 2
-/// \param disparity2 output disparity map from image 2 to image 1
+/// \param disp1 output disparity map from image 1 to image 2
+/// \param disp2 output disparity map from image 2 to image 1
 void disparityAW(Image im1, Image im2,
                  int dispMin, int dispMax,
                  const ParamDisparity& param,
-                 Image& disparity1, Image& disparity2) {
+                 Image& disp1, Image& disp2) {
     const int width=im1.width(), height=im1.height();  // Images dimensions
-    const int r = param.window_radius;                   // window's radius
-    const int nd = dispMax-dispMin+1;                    // Disparity range
-    std::cout << "Range of disparities: " << nd << " disparities, "<<std::endl;
+    const int r = param.window_radius;                 // Window radius
+#ifdef COMB_LEFT                                       // Disparity range
+    const int nd = 1; // Do not compute useless weights in target image
+#else
+    const int nd = dispMax-dispMin+1;
+#endif
 
     // Tabulated proximity weights (color distance)
-    float* distC = new float[3*255+1];
-    float e2=exp(-1/(3*param.gamma_c));
-    for(int x=0; x<=3*255; x++)
-        distC[x] = pow(e2,x);
+    const int maxL1 = im1.channels()*255; // Maximum L1 distance between colors
+    float* distC = new float[maxL1+1];
+    float e2=exp(-1/(im1.channels()*param.gamma_c));
+    distC[0]=1.0f;
+    for(int x=1; x<=maxL1; x++)
+        distC[x] = e2*distC[x-1]; // distC[x] = exp(-x/(c*gamma))
 
     // Tabulated proximity weights (spatial distance)
     const int dim=2*r+1; // window dimension
     float *distP = new float[dim*dim], *d=distP;
-    float e1=exp(-1/param.gamma_p);
     for(int y=-r; y<=r; y++)
     for(int x=-r; x<=r; x++)
-        *d++ = pow(e1,sqrt((float)(x*x+y*y)));
+        *d++ = exp(-sqrt((float)(x*x+y*y))/param.gamma_p);
 
     Image* cost = costVolume(im1, im2, dispMin, dispMax, param);
 
@@ -199,21 +194,19 @@ void disparityAW(Image im1, Image im2,
     for(int yp=0; yp<height; yp++) {
         // Image window for the weights in the reference image
         Image weights1(dim,dim);
-        // Vector of weights windows on the target image
+        // Weight windows in target image for each disparity (useless for
+        // COMB_LEFT, but better to have readable code than multiplying #ifdef)
         Image* weights = new Image[nd];
-        for(int d=dispMin; d<=dispMax; d++)
-            weights[d-dispMin] = Image(dim,dim);
+        for(int d=0; d<nd; d++) {
+            weights[d] = Image(dim,dim);
+            if(d+1<nd) // Support for dispMax computed later
+                support(im2, d,yp, r, distC, distP, weights[d]);
+        }
 
-#ifndef COMB_LEFT
-        // Target window weights for all disparities except dispMax
-        for(int d=dispMin; d<dispMax; d++)
-            support(im2, 0+d,yp, r, distC, distP, weights[(0+d-dispMin)%nd]);
-#endif
         for(int xp=0; xp<width; xp++) {
             // Reference window weights
             support(im1, xp,yp, r, distC, distP, weights1);
-#ifndef COMB_LEFT
-            // Target window weights at disparity dispMax
+#ifndef COMB_LEFT // Weight window at disparity dispMax in target image
             support(im2, xp+dispMax,yp, r, distC, distP,
                     weights[(xp+dispMax-dispMin)%nd]);
 #endif
@@ -221,22 +214,16 @@ void disparityAW(Image im1, Image im2,
             for(int d=dispMin; d<=dispMax; d++) {
                 if(0<=xp+d && xp+d<width) {
                     const Image& c = cost[d-dispMin]; // raw cost for disp. d
-#ifdef COMB_LEFT // Weights of target window
-
-                    const Image& weights2 = weights1; // Unused
-#else
                     const Image& weights2 = weights[(xp+d-dispMin)%nd];
-#endif
                     float E = costCombined(xp, xp+d, yp, r,
                                            weights1, weights2, c);
-                    // Winner takes all label selection
                     if(E1(xp,yp) > E) {
                         E1(xp,yp) = E;
-                        disparity1(xp,yp) = d;
+                        disp1(xp,yp) = d;
                     }
                     if(E2(xp+d,yp) > E) {
                         E2(xp+d,yp) = E;
-                        disparity2(xp+d,yp)= -d;
+                        disp2(xp+d,yp)= -d;
                     }
                 }
             }

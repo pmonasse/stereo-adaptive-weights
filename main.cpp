@@ -24,7 +24,7 @@ static const char* OUTFILE2="disparity_postprocessed.png";
 static void usage(const char* name) {
     ParamDisparity p;
     ParamOcclusion q;
-    std::cerr <<"Yoon-Kweon disparity map estimation with adaptive weights.\n"
+    std::cerr <<"Bilaterally weighted patches for disparity map computation.\n"
               << "Usage: " << name << " [options] im1.png im2.png dmin dmax\n\n"
               << "Options (default values in parentheses)\n"
               << "Adaptive weights parameters:\n"
@@ -110,18 +110,16 @@ int main(int argc, char *argv[])
         cmd.process(argc, argv);
     } catch(std::string str) {
         std::cerr << "Error: " << str << std::endl<<std::endl;
-        usage(argv[0]);
-        return 1;
+        argc=1; // To display usage
     }
-
-    if( argc!=5 ) {
+    if(argc!=5) {
         usage(argv[0]);
         return 1;
     }
 
     if(sense != 0 && sense != 1) {
         std::cerr << "Error: invalid camera motion direction " << sense
-            << " (must be 0 or 1)" << std::endl;
+                  << " (must be 0 or 1)" << std::endl;
         return 1;
     }
 
@@ -137,7 +135,7 @@ int main(int argc, char *argv[])
     // Set disparity range
     int dMin, dMax;
     if(! ((std::istringstream(argv[3])>>dMin).eof() &&
-        (std::istringstream(argv[4])>>dMax).eof())) {
+          (std::istringstream(argv[4])>>dMax).eof())) {
             std::cerr << "Error reading dMin or dMax" << std::endl;
             return 1;
     }

@@ -75,6 +75,17 @@ Image loadImage(const char* name) {
     return im;
 }
 
+/// Relative weight between pixels (x,y) and (x+dx,y+dy).
+float weight(const Image& im, int x, int y, int dx, int dy,
+             float gamma_c, float gamma_p) {
+    int d=0; // L1 color distance
+    for(int i=0; i<im.channels(); i++)
+        d += std::abs(im(x+dx,y+dy,i)-im(x,y,i));
+    return
+        std::exp(-d/(im.channels()*gamma_c)) *
+        std::exp(-std::sqrt(dx*dx+dy*dy)/gamma_p);
+}
+
 /// Compute the window of weights around pixel (xp,yp) in \a im1.
 Image show_weights(const Image& im1, const Image& im2, int xp, int yp, int xq,
                    Comb* comb, int r, float gamma_c, float gamma_p) {
@@ -87,22 +98,11 @@ Image show_weights(const Image& im1, const Image& im2, int xp, int yp, int xq,
             for(int x=-r; x<=r; x++)
                 if(0<=xp+x && xp+x<w1 &&
                    (!comb || (0<=xq+x && xq+x<w2))) {
-                    int d=0;
-                    for(int i=0; i<c1; i++)
-                        d += std::abs(im1(xp+x,yp+y,i)-im1(xp,yp,i));
-                    W(x+r,y+r) =
-                        std::exp(-d/(c1*gamma_c)) *
-                        std::exp(-std::sqrt(x*x+y*y)/gamma_p);
-                    if(comb) {
-                        d=0;
-                        for(int i=0; i<c2; i++)
-                            d += std::abs(im2(xq+x,yp+y,i)-im2(xq,yp,i));
-                        float w1 = W(x+r,y+r);
-                        W(x+r,y+r) = (*comb)
-                            (w1,
-                             std::exp(-d/(c2*gamma_c)) *
-                             std::exp(-std::sqrt(x*x+y*y)/gamma_p));
-                    }
+                    float w = weight(im1, xp,yp, x,y, gamma_c, gamma_p);
+                    if(comb)
+                        w = (*comb)(w,
+                                    weight(im2, xq,yp, x,y, gamma_c, gamma_p));
+                    W(x+r,y+r) = w;
                 }
     return W;
 }
