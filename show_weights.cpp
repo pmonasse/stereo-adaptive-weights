@@ -78,12 +78,12 @@ Image loadImage(const char* name) {
 /// Relative weight between pixels (x,y) and (x+dx,y+dy).
 float weight(const Image& im, int x, int y, int dx, int dy,
              float gamma_c, float gamma_p) {
-    int d=0; // L1 color distance
+    float d=0; // L1 color distance
     for(int i=0; i<im.channels(); i++)
         d += std::abs(im(x+dx,y+dy,i)-im(x,y,i));
     return
         std::exp(-d/(im.channels()*gamma_c)) *
-        std::exp(-std::sqrt(dx*dx+dy*dy)/gamma_p);
+        std::exp(-std::sqrt(float(dx*dx+dy*dy))/gamma_p);
 }
 
 /// Compute the window of weights around pixel (xp,yp) in \a im1.

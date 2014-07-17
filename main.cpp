@@ -55,10 +55,7 @@ static void usage(const char* name) {
               << "    -c sigmac: value of sigma_color ("
               <<q.sigma_color << ")\n"
               << "    -s sigmas: value of sigma_space ("
-              <<q.sigma_space << ")\n\n"
-              << "Display:\n"
-              << "    -a grayMin: value of gray for min disparity (255)\n"
-              << "    -b grayMax: value of gray for max disparity (0)"
+              <<q.sigma_space << ")"
               << std::endl;
 }
 
@@ -85,7 +82,6 @@ Image loadImage(const char* name) {
 
 /// Main program
 int main(int argc, char *argv[]) {
-    int grayMin=255, grayMax=0;
     int sense=0; // Camera motion direction: '0'=to-right, '1'=to-left
     CmdLine cmd;
 
@@ -103,10 +99,6 @@ int main(int argc, char *argv[]) {
     cmd.add( make_option('r',paramOcc.median_radius) );
     cmd.add( make_option('c',paramOcc.sigma_color) );
     cmd.add( make_option('s',paramOcc.sigma_space) );
-
-    // Display parameters
-    cmd.add( make_option('a',grayMin) );
-    cmd.add( make_option('b',grayMax) );
 
     try {
         cmd.process(argc, argv);
@@ -168,7 +160,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Detecting occlusions
-    detect_occlusion(disp1, disp2, dMin-1, paramOcc.tol_disp);
+    detect_occlusion(disp1,disp2,static_cast<float>(dMin-1),paramOcc.tol_disp);
     if(! save_disparity(outFile2.c_str(), disp1, dMin,dMax)) {
         std::cerr << "Error writing file " << outFile2 << std::endl;
         return 1;
@@ -177,9 +169,9 @@ int main(int argc, char *argv[]) {
     // Fill occlusions (post-processing)
     Image dispDense = disp1.clone();
     if(sense == 0)
-        dispDense.fillMaxX(dMin);
+        dispDense.fillMaxX(static_cast<float>(dMin));
     else
-        dispDense.fillMinX(dMin);
+        dispDense.fillMinX(static_cast<float>(dMin));
     fill_occlusion(dispDense, im1.median(1), disp1, dMin, dMax, paramOcc);
     if(! save_disparity(outFile3.c_str(), disp1, dMin,dMax)) {
         std::cerr << "Error writing file " << outFile3 << std::endl;

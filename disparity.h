@@ -25,9 +25,9 @@ struct ParamDisparity {
     ParamDisparity()
     : color_threshold(30),
       gradient_threshold(2),
-      alpha(0.9),
+      alpha(0.9f),
 	  gamma_c(12),
-	  gamma_p(17.5),
+	  gamma_p(17.5f),
       window_radius(17) {}
 };
 

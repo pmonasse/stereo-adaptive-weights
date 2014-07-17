@@ -117,10 +117,11 @@ static void support(const Image& im, int xp, int yp, int r,
         if(0<=yp+y && yp+y<height)
             for(int x=-r; x<=r; x++)
                 if(0<=xp+x && xp+x<width) {
-                    int d=0;
+                    float d=0;
                     for(int i=0; i<c; i++)
                         d += std::abs(im(xp+x,yp+y,i)-im(xp,yp,i));
-                    w(x+r,y+r)=distC[d]*distP[(y+r)*w.width()+(x+r)];
+                    w(x+r,y+r)=distC[static_cast<int>(d)]*
+                               distP[(y+r)*w.width()+(x+r)];
                 }
 }
 
@@ -218,11 +219,11 @@ void disparityAW(Image im1, Image im2,
                     float E = costCombined(xp, xp+d, yp, r, W1, W2, c);
                     if(E1(xp,yp) > E) {
                         E1(xp,yp) = E;
-                        disp1(xp,yp) = d;
+                        disp1(xp,yp) = static_cast<float>(d);
                     }
                     if(E2(xp+d,yp) > E) {
                         E2(xp+d,yp) = E;
-                        disp2(xp+d,yp)= -d;
+                        disp2(xp+d,yp)= -static_cast<float>(d);
                     }
                 }
             }
