@@ -1,8 +1,19 @@
 /**
  * @file show_weights.cpp
- * @brief Computation of adaptive weights in a square window
- * @author Laura F. Julià <fernandl@imagine.enpc.fr>
+ * @brief Computation of adaptive  (bilateral) weights in a square window
+ * @author Laura F. Julia <fernandl@imagine.enpc.fr>
  *         Pascal Monasse <monasse@imagine.enpc.fr>
+ *
+ * Copyright (c) 2014, Laura F. Julia, Pascal Monasse
+ * All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * You should have received a copy of the GNU General Pulic License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "disparity.h"

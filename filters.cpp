@@ -4,7 +4,7 @@
  * @author Pauline Tan <pauline.tan@ens-cachan.fr>
  *         Pascal Monasse <monasse@imagine.enpc.fr>
  *
- * Copyright (c) 2012-2013, Pauline Tan, Pascal Monasse
+ * Copyright (c) 2012-2014, Pauline Tan, Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify it
