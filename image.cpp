@@ -16,7 +16,8 @@
  */
 
 #include "image.h"
-#include "io_png.h"
+#include "nan.h"
+#include "io_tiff.h"
 #include <algorithm>
 #include <cassert>
 
@@ -74,29 +75,47 @@ void Image::kill() {
 ///
 /// The disp->gray function is affine: gray=a*disp+b.
 /// Pixels outside [0,255] are assumed invalid and written in cyan color.
-bool save_disparity(const char* fileName, const Image& disparity,
-                    int dMin, int dMax, int grayMin, int grayMax) {
-    const float a=(grayMax-grayMin)/float(dMax-dMin);
-    const float b=(grayMin*dMax-grayMax*dMin)/float(dMax-dMin);
+// bool save_disparity(const char* fileName, const Image& disparity,
+//                     int dMin, int dMax, int grayMin, int grayMax) {
+//     const float a=(grayMax-grayMin)/float(dMax-dMin);
+//     const float b=(grayMin*dMax-grayMax*dMin)/float(dMax-dMin);
 
-    const int w=disparity.width(), h=disparity.height();
-    const float* in=&(const_cast<Image&>(disparity))(0,0);
-    unsigned char *out = new unsigned char[3*w*h];
-    unsigned char *red=out, *green=out+w*h, *blue=out+2*w*h;
-    for(size_t i=w*h; i>0; i--, in++, red++) {
-        if((float)dMin<=*in && *in<=(float)dMax) {
-            float v = a * *in + b +0.5f;
-            if(v<0) v=0;
-            if(v>255) v=255;
-            *red = static_cast<unsigned char>(v);
-            *green++ = *red;
-            *blue++  = *red;
-        } else { // Cyan for disparities out of range
-            *red=0;
-            *green++ = *blue++ = 255;
+//     const int w=disparity.width(), h=disparity.height();
+//     const float* in=&(const_cast<Image&>(disparity))(0,0);
+//     unsigned char *out = new unsigned char[3*w*h];
+//     unsigned char *red=out, *green=out+w*h, *blue=out+2*w*h;
+//     for(size_t i=w*h; i>0; i--, in++, red++) {
+//         if((float)dMin<=*in && *in<=(float)dMax) {
+//             float v = a * *in + b +0.5f;
+//             if(v<0) v=0;
+//             if(v>255) v=255;
+//             *red = static_cast<unsigned char>(v);
+//             *green++ = *red;
+//             *blue++  = *red;
+//         } else { // Cyan for disparities out of range
+//             *red=0;
+//             *green++ = *blue++ = 255;
+//         }
+//     }
+//     bool ok = (io_png_write_u8(fileName, out, w, h, 3) == 0);
+//     delete [] out;
+//     return ok;
+// }
+
+/// Save \a disp map in float TIFF image.
+bool save_disparity(const char* fileName, const Image& disp,
+                    int dMin, int dMax) {
+    const int w=disp.width(), h=disp.height();
+    float *out = new float[w*h], *o=out;
+    for(int y=0; y<h; y++)
+        for(int x=0; x<w; x++) {
+            float v = disp(x,y);
+            if(! (is_number(v) &&
+                  static_cast<float>(dMin)<=v && v<=static_cast<float>(dMax)))
+                v = NaN;
+            *o++ = v;
         }
-    }
-    bool ok = (io_png_write_u8(fileName, out, w, h, 3) == 0);
+    bool ok = (io_tiff_write_f32(fileName, out, w, h, 1) == 0);
     delete [] out;
     return ok;
 }

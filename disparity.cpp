@@ -193,30 +193,29 @@ void disparityAW(Image im1, Image im2,
 #endif
     for(int yp=0; yp<height; yp++) {
         // Image window for the weights in the reference image
-        Image weights1(dim,dim);
+        Image W1(dim,dim);
         // Weight windows in target image for each disparity (useless for
         // COMB_LEFT, but better to have readable code than multiplying #ifdef)
-        Image* weights = new Image[nd];
+        Image* weights2 = new Image[nd];
         for(int d=0; d<nd; d++) {
-            weights[d] = Image(dim,dim);
+            weights2[d] = Image(dim,dim);
             if(d+1<nd) // Support for dispMax computed later
-                support(im2, d,yp, r, distC, distP, weights[d]);
+                support(im2, d,yp, r, distC, distP, weights2[d]);
         }
 
         for(int xp=0; xp<width; xp++) {
             // Reference window weights
-            support(im1, xp,yp, r, distC, distP, weights1);
+            support(im1, xp,yp, r, distC, distP, W1);
 #ifndef COMB_LEFT // Weight window at disparity dispMax in target image
             support(im2, xp+dispMax,yp, r, distC, distP,
-                    weights[(xp+dispMax-dispMin)%nd]);
+                    weights2[(xp+dispMax-dispMin)%nd]);
 #endif
             // Compute dissimilarity for all possible disparities
             for(int d=dispMin; d<=dispMax; d++) {
                 if(0<=xp+d && xp+d<width) {
                     const Image& c = cost[d-dispMin]; // raw cost for disp. d
-                    const Image& weights2 = weights[(xp+d-dispMin)%nd];
-                    float E = costCombined(xp, xp+d, yp, r,
-                                           weights1, weights2, c);
+                    const Image& W2 = weights2[(xp+d-dispMin)%nd];
+                    float E = costCombined(xp, xp+d, yp, r, W1, W2, c);
                     if(E1(xp,yp) > E) {
                         E1(xp,yp) = E;
                         disp1(xp,yp) = d;
@@ -228,7 +227,7 @@ void disparityAW(Image im1, Image im2,
                 }
             }
         }
-        delete [] weights;
+        delete [] weights2;
     }
     delete [] cost;
     delete [] distC;

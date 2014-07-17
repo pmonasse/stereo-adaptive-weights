@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.6)
 
 find_package(PNG)
+find_package(TIFF)
 
 set(SRC
     cmdLine.h
@@ -8,20 +9,34 @@ set(SRC
     filters.cpp
     image.cpp image.h
     io_png.c io_png.h
+    io_tiff.c io_tiff.h
     main.cpp
+    nan.h
     occlusion.cpp occlusion.h)
 
 set(SRC2
     cmdLine.h
     image.cpp image.h
     io_png.c io_png.h
+    io_tiff.c io_tiff.h
+    nan.h
     show_weights.cpp)
 
+set(SRC3
+    cmdLine.h
+    io_png.c io_png.h
+    io_tiff.c io_tiff.h
+    nan.h
+    tiff2png.cpp)
+
 add_executable(stereoAdaptiveWeights ${SRC})
-target_link_libraries(stereoAdaptiveWeights ${PNG_LIBRARIES})
+target_link_libraries(stereoAdaptiveWeights ${PNG_LIBRARIES} ${TIFF_LIBRARIES})
 
 add_executable(show_weights ${SRC2})
-target_link_libraries(show_weights ${PNG_LIBRARIES})
+target_link_libraries(show_weights ${PNG_LIBRARIES} ${TIFF_LIBRARIES})
+
+add_executable(tiff2png ${SRC3})
+target_link_libraries(tiff2png ${PNG_LIBRARIES} ${TIFF_LIBRARIES})
 
 set(COMBINE_WEIGHTS mult CACHE STRING
     "Weights combination (should be mult, plus, min, max or left")
@@ -52,4 +67,8 @@ if(UNIX)
     if(OPENMP_FOUND)
         set(CMAKE_EXE_LINKER_FLAGS  ${OpenMP_CXX_FLAGS})
     endif(OPENMP_FOUND)
+    set_target_properties(show_weights PROPERTIES
+                          COMPILE_FLAGS "-Wall -Wextra -Werror")
+    set_target_properties(tiff2png PROPERTIES
+                          COMPILE_FLAGS "-Wall -Wextra -Werror")
 endif(UNIX)

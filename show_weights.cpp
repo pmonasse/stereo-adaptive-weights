@@ -91,8 +91,8 @@ Image show_weights(const Image& im1, const Image& im2, int xp, int yp, int xq,
                    Comb* comb, int r, float gamma_c, float gamma_p) {
     Image W(2*r+1,2*r+1);
     std::fill_n(&W(0,0), W.width()*W.height(), 0);
-    int w1=im1.width(), h1=im1.height(), c1=im1.channels();
-    int w2=im2.width(), h2=im2.height(), c2=im2.channels();
+    int w1=im1.width(), h1=im1.height();
+    int w2=im2.width(), h2=im2.height();
     for(int y=-r; y<=r; y++)
         if(0<=yp+y && yp+y<h1 && (!comb || yp+y<h2))
             for(int x=-r; x<=r; x++)
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
 	}
 
     Comb* comb=0;
-    if(cmd.used('c') && im2.channels()!=0)
+    if(cmd.used('c') && im2.channels()!=0) {
         if(combine == "max")
             comb = new Comb(max);
         else if(combine == "min")
@@ -176,6 +176,7 @@ int main(int argc, char *argv[])
                       << "(should be max,min,mult or plus)" << std::endl;
             return 1;
         }
+    }
 
     Image w = show_weights(im1, im2, x, y, x+disp, comb,
                            p.window_radius, p.gamma_c, p.gamma_p);

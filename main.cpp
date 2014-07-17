@@ -12,9 +12,11 @@
 #include "io_png.h"
 #include <iostream>
 
-/// Names of output image files
-static const char* OUTFILE1="disparity.png";
-static const char* OUTFILE2="disparity_postprocessed.png";
+/// Default prefix of output image files
+static const char* PREFIX="disparity";
+static const char* SUFFIX1=".tif";     ///< Suffix for output 1: dense disparity
+static const char* SUFFIX2="_occ.tif"; ///< Suffix for output 2: LR filtered
+static const char* SUFFIX3="_pp.tif";  ///< Suffix for output 3: post_processed
 
 #ifndef COMB
 #error "The macro COMB must be set to one of the allowed values at compilation"
@@ -25,7 +27,8 @@ static void usage(const char* name) {
     ParamDisparity p;
     ParamOcclusion q;
     std::cerr <<"Bilaterally weighted patches for disparity map computation.\n"
-              << "Usage: " << name << " [options] im1.png im2.png dmin dmax\n\n"
+              << "Usage: " << name
+              << " [options] im1.png im2.png dmin dmax [out_prefix]\n\n"
               << "Options (default values in parentheses)\n"
               << "Adaptive weights parameters:\n"
               << "    --gcol gamma_col: gamma for color difference ("
@@ -81,8 +84,7 @@ Image loadImage(const char* name) {
 }
 
 /// Main program
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     int grayMin=255, grayMax=0;
     int sense=0; // Camera motion direction: '0'=to-right, '1'=to-left
     CmdLine cmd;
@@ -112,7 +114,7 @@ int main(int argc, char *argv[])
         std::cerr << "Error: " << str << std::endl<<std::endl;
         argc=1; // To display usage
     }
-    if(argc!=5) {
+    if(argc!=5 && argc!=6) {
         usage(argv[0]);
         return 1;
     }
@@ -145,36 +147,42 @@ int main(int argc, char *argv[])
     }
 
     // Create disparity images
-    Image disparity(width,height);
-    std::fill_n(&disparity(0,0), width*height, dMin-1);
-    Image disparity2(width,height);
-    std::fill_n(&disparity2(0,0), width*height, dMin-1);
+    Image disp1(width,height);
+    std::fill_n(&disp1(0,0), width*height, dMin-1);
+    Image disp2(width,height);
+    std::fill_n(&disp2(0,0), width*height, dMin-1);
 
     // Compute disparity using adaptive weights.
-    disparityAW(im1, im2, dMin, dMax, paramD,disparity,disparity2);
+    disparityAW(im1, im2, dMin, dMax, paramD,disp1,disp2);
+
+    // Prepare output file names
+    std::string prefix((argc>5)? argv[5]: PREFIX);
+    std::string outFile1 = prefix + SUFFIX1; // initial disparity map
+    std::string outFile2 = prefix + SUFFIX2; // with occlusions
+    std::string outFile3 = prefix + SUFFIX3; // filled occlusions
 
     // Save disparity image
-    if(! save_disparity(OUTFILE1, disparity, dMin,dMax, grayMin,grayMax)) {
-        std::cerr << "Error writing file " << OUTFILE1 << std::endl;
+    if(! save_disparity(outFile1.c_str(), disp1, dMin,dMax)) {
+        std::cerr << "Error writing file " << outFile1 << std::endl;
         return 1;
     }
 
     // Detecting occlusions
-    std::cout << "Detect occlusions...";
-    detect_occlusion(disparity, disparity2, dMin-1, paramOcc.tol_disp);
+    detect_occlusion(disp1, disp2, dMin-1, paramOcc.tol_disp);
+    if(! save_disparity(outFile2.c_str(), disp1, dMin,dMax)) {
+        std::cerr << "Error writing file " << outFile2 << std::endl;
+        return 1;
+    }
 
-    // Save disparity image with occlusions filled and smoothed image
-    std::cout << "Post-processing: fill occlusions" << std::endl;
-    Image dispDense = disparity.clone();
+    // Fill occlusions (post-processing)
+    Image dispDense = disp1.clone();
     if(sense == 0)
         dispDense.fillMaxX(dMin);
     else
         dispDense.fillMinX(dMin);
-
-    std::cout << "Post-processing: smooth the disparity map" << std::endl;
-    fill_occlusion(dispDense, im1.median(1), disparity, dMin, dMax, paramOcc);
-    if(! save_disparity(OUTFILE2, disparity, dMin,dMax, grayMin,grayMax)) {
-        std::cerr << "Error writing file " << OUTFILE2 << std::endl;
+    fill_occlusion(dispDense, im1.median(1), disp1, dMin, dMax, paramOcc);
+    if(! save_disparity(outFile3.c_str(), disp1, dMin,dMax)) {
+        std::cerr << "Error writing file " << outFile3 << std::endl;
         return 1;
     }
 
