@@ -3,6 +3,26 @@ cmake_minimum_required(VERSION 2.6)
 find_package(PNG)
 find_package(TIFF)
 
+IF(NOT PNG_FOUND)
+    FIND_PACKAGE(ZLIB)
+    IF(NOT ZLIB_FOUND)
+        ADD_SUBDIRECTORY(third_party/zlib-1.2.8)
+    ENDIF(NOT ZLIB_FOUND)
+    INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIRS})
+    ADD_SUBDIRECTORY(third_party/libpng-1.6.12)
+    INCLUDE_DIRECTORIES(${PNG_INCLUDE_DIRS})
+ENDIF(NOT PNG_FOUND)
+
+IF(NOT TIFF_FOUND)
+    FIND_PACKAGE(JPEG)
+    IF(NOT JPEG_FOUND)
+        ADD_SUBDIRECTORY(third_party/jpeg-9a)
+    ENDIF(NOT JPEG_FOUND)
+    INCLUDE_DIRECTORIES(${JPEG_INCLUDE_DIR})
+    ADD_SUBDIRECTORY(third_party/tiff-4.0.3)
+    INCLUDE_DIRECTORIES(${TIFF_INCLUDE_DIR})
+ENDIF(NOT TIFF_FOUND)
+
 set(SRC
     cmdLine.h
     disparity.cpp disparity.h
