@@ -1,14 +1,17 @@
 cmake_minimum_required(VERSION 2.6)
 
+# zlib is needed by libPNG and also by libTIFF, even though the cmake module for
+# libTIFF does not specify that
+find_package(ZLIB)
+if(NOT ZLIB_FOUND)
+  add_subdirectory(third_party/zlib-1.2.8)
+endif(NOT ZLIB_FOUND)
+include_directories(${ZLIB_INCLUDE_DIRS})
+
 find_package(PNG)
 find_package(TIFF)
 
 if(NOT PNG_FOUND)
-    find_package(ZLIB)
-    if(NOT ZLIB_FOUND)
-        add_subdirectory(third_party/zlib-1.2.8)
-    endif(NOT ZLIB_FOUND)
-    include_directories(${ZLIB_INCLUDE_DIRS})
     add_subdirectory(third_party/libpng-1.6.12)
     include_directories(${PNG_INCLUDE_DIRS})
 endif(NOT PNG_FOUND)
@@ -50,13 +53,13 @@ set(SRC3
     tiff2png.cpp)
 
 add_executable(stereoAdaptiveWeights ${SRC})
-target_link_libraries(stereoAdaptiveWeights ${PNG_LIBRARIES} ${TIFF_LIBRARIES})
+target_link_libraries(stereoAdaptiveWeights ${TIFF_LIBRARIES} ${PNG_LIBRARIES})
 
 add_executable(show_weights ${SRC2})
-target_link_libraries(show_weights ${PNG_LIBRARIES} ${TIFF_LIBRARIES})
+target_link_libraries(show_weights ${TIFF_LIBRARIES} ${PNG_LIBRARIES})
 
 add_executable(tiff2png ${SRC3})
-target_link_libraries(tiff2png ${PNG_LIBRARIES} ${TIFF_LIBRARIES})
+target_link_libraries(tiff2png ${TIFF_LIBRARIES} ${PNG_LIBRARIES})
 
 set(COMBINE_WEIGHTS mult CACHE STRING
     "Weights combination (should be mult, plus, min, max or left")
@@ -85,7 +88,7 @@ if(UNIX)
     set_target_properties(stereoAdaptiveWeights PROPERTIES
                           COMPILE_FLAGS "-Wall -Wextra -Werror ${OpenMP_CXX_FLAGS}")
     if(OPENMP_FOUND)
-        set(CMAKE_EXE_LINKER_FLAGS  ${OpenMP_CXX_FLAGS})
+        set(CMAKE_EXE_LINKER_FLAGS ${OpenMP_CXX_FLAGS})
     endif(OPENMP_FOUND)
     set_target_properties(show_weights PROPERTIES
                           COMPILE_FLAGS "-Wall -Wextra -Werror")
