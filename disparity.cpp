@@ -80,18 +80,15 @@ static Image costLayer(Image im1, Image im2,
                 // L1 color distance.
                 costColor = 0;
                 for(int i=0; i<channels; i++)
-                    costColor += abs(im1(x,y,i)-im2(x+d,y,i));
+                    costColor += std::abs(im1(x,y,i)-im2(x+d,y,i));
                 costColor /= (float)channels;
                 // Color threshold
                 if(costColor > param.color_threshold)
                     costColor = param.color_threshold;
 
                 // x-derivatives absolute difference and threshold
-                costGradient = gradient1(x,y)-gradient2(x+d,y);
-                if(costGradient < 0)
-                    costGradient = -costGradient;
-                if(costGradient > param.gradient_threshold)
-                    costGradient = param.gradient_threshold;
+                costGradient=std::min(std::abs(gradient1(x,y)-gradient2(x+d,y)),
+                                      param.gradient_threshold);
             }
             // Linear combination of the two penalties
             cost(x,y) = (1-param.alpha)*costColor + param.alpha*costGradient;
