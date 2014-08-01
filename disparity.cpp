@@ -21,7 +21,6 @@
 #include "io_png.h"
 #include <algorithm>
 #include <limits>
-#include <vector>
 #include <cmath>
 #include <cassert>
 
@@ -119,7 +118,7 @@ static Image* costVolume(const Image& im1, const Image& im2,
 /// \param distP Tabulated position distances
 /// \param w The output support window
 static void support(const Image& im, int xp, int yp, int r,
-                    float* distC, float* distP, Image& w) {
+                    float* distC, Image& w) {
     const int width=im.width(), height=im.height(), c=im.channels();
     for(int y=-r; y<=r; y++)
         if(0<=yp+y && yp+y<height)
@@ -128,29 +127,28 @@ static void support(const Image& im, int xp, int yp, int r,
                     float d=0;
                     for(int i=0; i<c; i++)
                         d += std::abs(im(xp+x,yp+y,i)-im(xp,yp,i));
-                    w(x+r,y+r)=distC[static_cast<int>(d)]*
-                               distP[(y+r)*w.width()+(x+r)];
+                    w(x+r,y+r)=distC[static_cast<int>(d)];
                 }
 }
 
 /// Combined cost of matching points (xp,yp) to (xq,yp).
 ///
 /// The support weights of p and q are \a wp and \a wq. The elementary pixel
-/// cost is in image \a cost.
+/// cost is in image \a e.
 float costCombined(int xp, int xq, int yp, int r,
-                   const Image& wp, const Image& wq, const Image& cost) {
-    const int width = cost.width();
-    float num=0, den=0;
+                   const Image& wp, const Image& wq,
+                   const float* distP, const Image& e) {
+    const int width = e.width();
+    float num=0, den=0; // Numerator and denominator in the fraction
     for(int y=-r; y<=r; y++)
-        if(0<=yp+y && yp+y<cost.height())
+        if(0<=yp+y && yp+y<e.height())
             for(int x=-r; x<=r; x++)
                 if(0<=xp+x && xp+x<width && 0<=xq+x && xq+x<width) {
                     float w1=wp(x+r,y+r); // Weight p
                     float w2=wq(x+r,y+r); // Weight q
-                    // Combination of weights and raw cost
-                    num+=COMB_WEIGHTS(w1,w2)*cost(xp+x,yp+y);
-                    // normalization term
-                    den+=COMB_WEIGHTS(w1,w2);
+                    float comb = distP[(y+r)*(2*r+1)+(x+r)]*COMB_WEIGHTS(w1,w2);
+                    num+=comb*e(xp+x,yp+y);
+                    den+=comb;
                 }
     return num/den;
 }
@@ -159,20 +157,19 @@ float costCombined(int xp, int xq, int yp, int r,
 ///
 /// The dissimilarity is computed putting adaptive weights on the raw cost.
 /// \param im1,im2 the two color images
-/// \param dispMin,dispMax disparity range
+/// \param dMin,dMax disparity range
 /// \param param raw cost computation parameters
 /// \param disp1 output disparity map from image 1 to image 2
 /// \param disp2 output disparity map from image 2 to image 1
 void disparityAW(Image im1, Image im2,
-                 int dispMin, int dispMax,
-                 const ParamDisparity& param,
+                 int dMin, int dMax, const ParamDisparity& param,
                  Image& disp1, Image& disp2) {
     const int width=im1.width(), height=im1.height();  // Images dimensions
     const int r = param.window_radius;                 // Window radius
 #ifdef COMB_LEFT                                       // Disparity range
     const int nd = 1; // Do not compute useless weights in target image
 #else
-    const int nd = dispMax-dispMin+1;
+    const int nd = dMax-dMin+1;
 #endif
 
     // Tabulated proximity weights (color distance)
@@ -188,9 +185,9 @@ void disparityAW(Image im1, Image im2,
     float *distP = new float[dim*dim], *d=distP;
     for(int y=-r; y<=r; y++)
     for(int x=-r; x<=r; x++)
-        *d++ = exp(-sqrt((float)(x*x+y*y))/param.gamma_p);
+        *d++ = exp(-2.0f*sqrt((float)(x*x+y*y))/param.gamma_p);
 
-    Image* cost = costVolume(im1, im2, dispMin, dispMax, param);
+    Image* cost = costVolume(im1, im2, dMin, dMax, param);
 
     // Images of dissimilarity 1->2 and 2->1
     Image E1(width,height), E2(width,height);
@@ -200,7 +197,7 @@ void disparityAW(Image im1, Image im2,
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-    for(int yp=0; yp<height; yp++) {
+    for(int y=0; y<height; y++) {
         // Image window for the weights in the reference image
         Image W1(dim,dim);
         // Weight windows in target image for each disparity (useless for
@@ -208,30 +205,29 @@ void disparityAW(Image im1, Image im2,
         Image* weights2 = new Image[nd];
         for(int d=0; d<nd; d++) {
             weights2[d] = Image(dim,dim);
-            if(d+1<nd) // Support for dispMax computed later
-                support(im2, d,yp, r, distC, distP, weights2[d]);
+            if(d+1<nd) // Support for dMax computed later
+                support(im2, d,y, r, distC, weights2[d]);
         }
 
-        for(int xp=0; xp<width; xp++) {
+        for(int x=0; x<width; x++) {
             // Reference window weights
-            support(im1, xp,yp, r, distC, distP, W1);
-#ifndef COMB_LEFT // Weight window at disparity dispMax in target image
-            support(im2, xp+dispMax,yp, r, distC, distP,
-                    weights2[(xp+dispMax-dispMin)%nd]);
+            support(im1, x,y, r, distC, W1);
+#ifndef COMB_LEFT // Weight window at disparity dMax in target image
+            support(im2, x+dMax,y, r, distC, weights2[(x+dMax-dMin)%nd]);
 #endif
             // Compute dissimilarity for all possible disparities
-            for(int d=dispMin; d<=dispMax; d++) {
-                if(0<=xp+d && xp+d<width) {
-                    const Image& c = cost[d-dispMin]; // raw cost for disp. d
-                    const Image& W2 = weights2[(xp+d-dispMin)%nd];
-                    float E = costCombined(xp, xp+d, yp, r, W1, W2, c);
-                    if(E1(xp,yp) > E) {
-                        E1(xp,yp) = E;
-                        disp1(xp,yp) = static_cast<float>(d);
+            for(int d=dMin; d<=dMax; d++) {
+                if(0<=x+d && x+d<width) {
+                    const Image& e = cost[d-dMin]; // raw cost for disp. d
+                    const Image& W2 = weights2[(x+d-dMin)%nd];
+                    float E = costCombined(x, x+d, y, r, W1, W2, distP, e);
+                    if(E1(x,y) > E) {
+                        E1(x,y) = E;
+                        disp1(x,y) = static_cast<float>(d);
                     }
-                    if(E2(xp+d,yp) > E) {
-                        E2(xp+d,yp) = E;
-                        disp2(xp+d,yp)= -static_cast<float>(d);
+                    if(E2(x+d,y) > E) {
+                        E2(x+d,y) = E;
+                        disp2(x+d,y)= -static_cast<float>(d);
                     }
                 }
             }

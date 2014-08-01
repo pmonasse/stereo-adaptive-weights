@@ -41,6 +41,9 @@ static float mult(float a, float b) {
 static float plus(float a, float b) {
     return a+b;
 }
+static float left(float a, float) {
+    return a;
+}
 
 /// Usage Description
 static void usage(const char* name) {
@@ -86,15 +89,12 @@ Image loadImage(const char* name) {
     return im;
 }
 
-/// Relative weight between pixels (x,y) and (x+dx,y+dy).
-float weight(const Image& im, int x, int y, int dx, int dy,
-             float gamma_c, float gamma_p) {
+/// Relative color weight between pixels (x,y) and (x+dx,y+dy).
+float weight(const Image& im, int x, int y, int dx, int dy, float gamma_c) {
     float d=0; // L1 color distance
     for(int i=0; i<im.channels(); i++)
         d += std::abs(im(x+dx,y+dy,i)-im(x,y,i));
-    return
-        std::exp(-d/(im.channels()*gamma_c)) *
-        std::exp(-std::sqrt(float(dx*dx+dy*dy))/gamma_p);
+    return std::exp(-d/(im.channels()*gamma_c));
 }
 
 /// Compute the window of weights around pixel (xp,yp) in \a im1.
@@ -104,16 +104,17 @@ Image show_weights(const Image& im1, const Image& im2, int xp, int yp, int xq,
     std::fill_n(&W(0,0), W.width()*W.height(), 0);
     int w1=im1.width(), h1=im1.height();
     int w2=im2.width(), h2=im2.height();
+    const float f = (comb? 2.0f: 1.0f);
     for(int y=-r; y<=r; y++)
         if(0<=yp+y && yp+y<h1 && (!comb || yp+y<h2))
             for(int x=-r; x<=r; x++)
                 if(0<=xp+x && xp+x<w1 &&
                    (!comb || (0<=xq+x && xq+x<w2))) {
-                    float w = weight(im1, xp,yp, x,y, gamma_c, gamma_p);
+                    float w = weight(im1, xp,yp, x,y, gamma_c);
                     if(comb)
-                        w = (*comb)(w,
-                                    weight(im2, xq,yp, x,y, gamma_c, gamma_p));
-                    W(x+r,y+r) = w;
+                        w = (*comb)(w, weight(im2, xq,yp, x,y, gamma_c));
+                    W(x+r,y+r) = w *
+                        std::exp(-f*std::sqrt(float(x*x+y*y))/gamma_p);
                 }
     return W;
 }
@@ -174,7 +175,9 @@ int main(int argc, char *argv[])
 
     Comb* comb=0;
     if(cmd.used('c') && im2.channels()!=0) {
-        if(combine == "max")
+        if(combine == "left")
+            comb = new Comb(left);
+        else if(combine == "max")
             comb = new Comb(max);
         else if(combine == "min")
             comb = new Comb(min);
@@ -184,7 +187,7 @@ int main(int argc, char *argv[])
             comb = new Comb(plus);
         else {
             std::cerr << "Unrecognized option for weights combination "
-                      << "(should be max,min,mult or plus)" << std::endl;
+                      << "(should be left,max,min,mult or plus)" << std::endl;
             return 1;
         }
     }

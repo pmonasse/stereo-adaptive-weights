@@ -42,7 +42,7 @@ struct ParamDisparity {
       window_radius(17) {}
 };
 
-void disparityAW(Image im1, Image im2, int dispMin, int dispMax,
+void disparityAW(Image im1, Image im2, int dMin, int dMax,
                  const ParamDisparity& param, Image& disp1, Image& disp2);
 
 #endif
