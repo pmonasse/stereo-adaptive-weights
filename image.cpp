@@ -17,6 +17,7 @@
 
 #include "image.h"
 #include "nan.h"
+#include "io_png.h"
 #include "io_tiff.h"
 #include <algorithm>
 #include <cassert>
@@ -69,6 +70,19 @@ void Image::kill() {
         delete count;
         delete [] tab;
     }
+}
+
+/// Convert image to gray level
+Image Image::gray() const {
+    if(channels() == 1)
+        return *this;
+    assert(channels() == 3);
+    Image out(w,h);
+    const float* in = tab;
+    for(int y=0; y<h; y++)
+        for(int x=0; x<w; x++, in+=3)
+            out(x,y) = rgb_to_gray(in[0], in[1], in[2]);
+    return out;
 }
 
 /// Save \a disp map in float TIFF image.

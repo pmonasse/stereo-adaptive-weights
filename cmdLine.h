@@ -2,8 +2,8 @@
  * @file cmdLine.h
  * @brief Command line option parsing
  * @author Pascal Monasse
- *
- * Copyright (c) 2012-2013 Pascal Monasse
+ * 
+ * Copyright (c) 2012 Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -30,28 +30,32 @@
 #include <sstream>
 #include <cassert>
 
+#ifdef _WIN32
+#pragma warning(disable:4290) // exception specification ignored...
+#endif
+
 /// Base class for option/switch
 class Option {
 public:
-    char c; //< Option letter (eg 's' for option -s)
-    bool used; //< Does the command line use that option?
-    std::string longName; // Optional long name (eg "switch" for --switch)
+    char c; ///< Option letter (eg 's' for option -s)
+    bool used; ///< Does the command line use that option?
+    std::string longName; /// Optional long name (eg "switch" for --switch)
 
-    // Constructor with short name/long name
+    /// Constructor with short name/long name
     Option(char d, std::string name)
     : c(d), used(false), longName(name) {}
     virtual ~Option() {}
-    virtual bool check(int& argc, char* argv[])=0; //< Option found at argv[0]?
-    virtual Option* clone() const=0; //< Copy
+    virtual bool check(int& argc, char* argv[])=0; ///< Option found at argv[0]?
+    virtual Option* clone() const=0; ///< Copy
 };
 
 /// Option on/off is called a switch
 class OptionSwitch : public Option {
 public:
-    // Constructor with short name/long name (optional)
+    /// Constructor with short name/long name (optional)
     OptionSwitch(char c, std::string name="")
     : Option(c,name) {}
-    // Find switch in argv[0]
+    /// Find switch in argv[0]
     bool check(int& argc, char* argv[]) {
         if(std::string("-")+c==argv[0] ||
            (!longName.empty() && std::string("--")+longName==argv[0])) {
@@ -67,21 +71,21 @@ public:
         }
         return false;
     }
-    // Copy
+    /// Copy
     Option* clone() const {
         return new OptionSwitch(c, longName);
     }
 };
 
-/// Option with an argument of type T. The type must be readable by operator>>
+/// Option with an argument of type T, which must be readable by operator>>
 template <class T>
 class OptionField : public Option {
 public:
-    // Constructor. The result with be stored in variable @field.
+    /// Constructor. The result with be stored in variable @field.
     OptionField(char c, T& field, std::string name="")
     : Option(c,name), _field(field) {}
-    // Find option in argv[0] and argument in argv[1]. Throw an exception
-    // (type std::string) if the argument cannot be read.
+    /// Find option in argv[0] and argument in argv[1]. Throw an exception
+    /// (type std::string) if the argument cannot be read.
     bool check(int& argc, char* argv[]) {
         std::string param; int arg=0;
         if(std::string("-")+c==argv[0] ||
@@ -98,7 +102,8 @@ public:
             param=std::string(argv[0]).substr(size); arg=1;
         }
         if(arg>0) {
-            if(! read_param(param))
+            std::stringstream str(param); char unused;
+            if((str >> _field).fail() || !(str>>unused).fail())
                 throw std::string("Unable to interpret ")
                     +param+" as argument of "+argv[0];
             used = true;
@@ -108,25 +113,13 @@ public:
         }
         return false;
     }
-    bool read_param(const std::string& param) {
-        std::stringstream str(param);
-        return !((str >> _field).fail() || !str.eof());
-    }
-    // Copy
+    /// Copy
     Option* clone() const {
         return new OptionField<T>(c, _field, longName);
     }
 private:
-    T& _field; //< Reference to variable where to store the value
+    T& _field; ///< Reference to variable where to store the value
 };
-
-/// Template specialization to be able to take parameter including space.
-/// Generic method would do >>_field (stops at space) and test eof (false).
-template <>
-inline bool OptionField<std::string>::read_param(const std::string& param) {
-    _field = param;
-    return true;
-}
 
 /// New switch option
 OptionSwitch make_switch(char c, std::string name="") {
@@ -143,18 +136,18 @@ OptionField<T> make_option(char c, T& field, std::string name="") {
 class CmdLine {
     std::vector<Option*> opts;
 public:
-    // Destructor
+    /// Destructor
     ~CmdLine() {
         std::vector<Option*>::iterator it=opts.begin();
         for(; it != opts.end(); ++it)
             delete *it;
     }
-    // Add an option
+    /// Add an option
     void add(const Option& opt) {
         opts.push_back( opt.clone() );
     }
-    // Parse of command line acting as a filter. All options are virtually
-    // removed from the command line.
+    /// Parse of command line acting as a filter. All options are virtually
+    /// removed from the command line.
     void process(int& argc, char* argv[]) throw(std::string) {
         std::vector<Option*>::iterator it=opts.begin();
         for(; it != opts.end(); ++it)
@@ -174,7 +167,7 @@ public:
                     break;
                 }
             }
-            if(! found) { // A single dash and a negative number are not options
+            if(! found) { // A negative number is not an option
                 if(std::string(argv[i]).size()>1 && argv[i][0] == '-') {
                     std::istringstream str(argv[i]);
                     float v;
@@ -185,7 +178,7 @@ public:
             }
         }
     }
-    // Was the option used in last parsing?
+    /// Was the option used in last parsing?
     bool used(char c) const {
         std::vector<Option*>::const_iterator it=opts.begin();
         for(; it != opts.end(); ++it)

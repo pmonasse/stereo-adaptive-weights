@@ -19,27 +19,25 @@
 #ifndef DISPARITY_H
 #define DISPARITY_H
 
-#include <algorithm>
-
 class Image;
 
 /// Parameters specific to the disparity computation with adaptive weights
 struct ParamDisparity {
-    float color_threshold; ///< Max cost for color difference term
-    float gradient_threshold; ///< Max cost for gradient difference term
-    float alpha; ///< Balance between color/gradient difference
-	float gamma_c; ///< Weight of color similarity (higher means less weight)
-	float gamma_p; ///< Weight for position (higher means less weight)
-    int window_radius; ///< Radius r of window, size is (2*r+1)x(2*r+1)
+    float tauCol;   ///< Max cost for color difference term
+    float tauGrad;  ///< Max cost for gradient difference term
+    float alpha;    ///< Balance between color/gradient difference
+	float gammaCol; ///< Weight of color similarity (higher means less weight)
+	float gammaPos; ///< Weight for position (higher means less weight)
+    int radius;     ///< Radius r of window, size is (2*r+1)x(2*r+1)
 
     // Constructor with default parameters
     ParamDisparity()
-    : color_threshold(30),
-      gradient_threshold(2),
+    : tauCol(30),
+      tauGrad(2),
       alpha(0.9f),
-	  gamma_c(12),
-	  gamma_p(17.5f),
-      window_radius(17) {}
+	  gammaCol(12),
+	  gammaPos(17.5f),
+      radius(17) {}
 };
 
 void disparityAW(Image im1, Image im2, int dMin, int dMax,

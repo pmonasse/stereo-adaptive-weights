@@ -18,7 +18,6 @@
 
 #include "disparity.h"
 #include "image.h"
-#include "io_png.h"
 #include <algorithm>
 #include <limits>
 #include <cmath>
@@ -40,19 +39,6 @@
 #error "Unknown combination of weights"
 #endif
 
-/// Convert image \a in to gray scale.
-Image gray(const Image& in) {
-    if(in.channels() == 1)
-        return in.clone();
-    assert(in.channels() == 3);
-    const int w=in.width(), h=in.height();
-    Image out(w,h);
-    for(int y=0; y<h; y++)
-        for(int x=0; x<w; x++)
-            out(x,y) = rgb_to_gray(in(x,y,0), in(x,y,1), in(x,y,2));
-    return out;
-}
-
 /// Computes image of raw matching costs e at disparity d.
 ///
 /// At each pixel, a linear combination of colors L1 distance (with max
@@ -71,8 +57,8 @@ static Image costLayer(Image im1, Image im2,
     for(int y=0; y<height; y++)
         for(int x=0; x<width; x++) {
             // Max distance if disparity moves outside image
-            float costColor = param.color_threshold;
-            float costGradient = param.gradient_threshold;
+            float costColor = param.tauCol;
+            float costGradient = param.tauGrad;
 
             // Color L1 distance
             if(0<=x+d && x+d<width) {
@@ -82,12 +68,12 @@ static Image costLayer(Image im1, Image im2,
                     costColor += std::abs(im1(x,y,i)-im2(x+d,y,i));
                 costColor /= (float)channels;
                 // Color threshold
-                if(costColor > param.color_threshold)
-                    costColor = param.color_threshold;
+                if(costColor > param.tauCol)
+                    costColor = param.tauCol;
 
                 // x-derivatives absolute difference and threshold
                 costGradient=std::min(std::abs(gradient1(x,y)-gradient2(x+d,y)),
-                                      param.gradient_threshold);
+                                      param.tauGrad);
             }
             // Linear combination of the two penalties
             cost(x,y) = (1-param.alpha)*costColor + param.alpha*costGradient;
@@ -99,8 +85,8 @@ static Image costLayer(Image im1, Image im2,
 static Image* costVolume(const Image& im1, const Image& im2,
                          int dMin, int dMax, const ParamDisparity& param) {
     // Compute x-derivatives of both images
-    Image grad1 = gray(im1).gradX();
-    Image grad2 = gray(im2).gradX();
+    Image grad1 = im1.gray().gradX();
+    Image grad2 = im2.gray().gradX();
 
     // Compute raw matching cost for all disparities.
     Image* cost = new Image[dMax-dMin+1];
@@ -115,7 +101,6 @@ static Image* costVolume(const Image& im1, const Image& im2,
 /// \param xp,yp Center point
 /// \param r Window radius
 /// \param distC Tabulated color distances
-/// \param distP Tabulated position distances
 /// \param w The output support window
 static void support(const Image& im, int xp, int yp, int r,
                     float* distC, Image& w) {
@@ -164,9 +149,9 @@ float costCombined(int xp, int xq, int yp, int r,
 void disparityAW(Image im1, Image im2,
                  int dMin, int dMax, const ParamDisparity& param,
                  Image& disp1, Image& disp2) {
-    const int width=im1.width(), height=im1.height();  // Images dimensions
-    const int r = param.window_radius;                 // Window radius
-#ifdef COMB_LEFT                                       // Disparity range
+    const int width=im1.width(), height=im1.height();
+    const int r = param.radius;
+#ifdef COMB_LEFT // Disparity range
     const int nd = 1; // Do not compute useless weights in target image
 #else
     const int nd = dMax-dMin+1;
@@ -175,7 +160,7 @@ void disparityAW(Image im1, Image im2,
     // Tabulated proximity weights (color distance)
     const int maxL1 = im1.channels()*255; // Maximum L1 distance between colors
     float* distC = new float[maxL1+1];
-    float e2=exp(-1/(im1.channels()*param.gamma_c));
+    float e2=exp(-1/(im1.channels()*param.gammaCol));
     distC[0]=1.0f;
     for(int x=1; x<=maxL1; x++)
         distC[x] = e2*distC[x-1]; // distC[x] = exp(-x/(c*gamma))
@@ -185,7 +170,7 @@ void disparityAW(Image im1, Image im2,
     float *distP = new float[dim*dim], *d=distP;
     for(int y=-r; y<=r; y++)
     for(int x=-r; x<=r; x++)
-        *d++ = exp(-2.0f*sqrt((float)(x*x+y*y))/param.gamma_p);
+        *d++ = exp(-2.0f*sqrt((float)(x*x+y*y))/param.gammaPos);
 
     Image* cost = costVolume(im1, im2, dMin, dMax, param);
 
@@ -198,7 +183,7 @@ void disparityAW(Image im1, Image im2,
 #pragma omp parallel for
 #endif
     for(int y=0; y<height; y++) {
-        // Image window for the weights in the reference image
+        // Weight window in reference image
         Image W1(dim,dim);
         // Weight windows in target image for each disparity (useless for
         // COMB_LEFT, but better to have readable code than multiplying #ifdef)
@@ -215,10 +200,9 @@ void disparityAW(Image im1, Image im2,
 #ifndef COMB_LEFT // Weight window at disparity dMax in target image
             support(im2, x+dMax,y, r, distC, weights2[(x+dMax-dMin)%nd]);
 #endif
-            // Compute dissimilarity for all possible disparities
             for(int d=dMin; d<=dMax; d++) {
                 if(0<=x+d && x+d<width) {
-                    const Image& e = cost[d-dMin]; // raw cost for disp. d
+                    const Image& e = cost[d-dMin]; // Raw cost for disp. d
                     const Image& W2 = weights2[(x+d-dMin)%nd];
                     float E = costCombined(x, x+d, y, r, W1, W2, distP, e);
                     if(E1(x,y) > E) {

@@ -46,6 +46,7 @@ public:
     int channels() const { return c; }
     float  operator()(int i,int j,int d=0) const { return tab[(j*w+i)*c+d]; }
     float& operator()(int i,int j,int d=0)       { return tab[(j*w+i)*c+d]; }
+    Image gray() const;
 
     // Filters (implemented in filters.cpp)
     Image gradX() const;

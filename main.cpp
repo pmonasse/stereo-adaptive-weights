@@ -43,17 +43,17 @@ static void usage(const char* name) {
               << "Options (default values in parentheses)\n"
               << "Adaptive weights parameters:\n"
               << "    --gcol gamma_col: gamma for color difference ("
-              <<p.gamma_c<<")\n"
+              <<p.gammaCol<<")\n"
               << "    --gpos gamma_pos: gamma for spatial distance ("
-              <<p.gamma_p<<")\n"
+              <<p.gammaPos<<")\n"
               << "    -R radius: radius of patch window ("
-              <<p.window_radius << ")\n"
+              <<p.radius << ")\n"
               << "    -A alpha: value of alpha for matching cost ("
               <<p.alpha<<")\n"
               << "    -t T: threshold of color difference in matching cost ("
-              <<p.color_threshold<<")\n"
+              <<p.tauCol<<")\n"
               << "    -g G: threshold of gradient difference in matching cost ("
-              <<p.gradient_threshold << ")\n"
+              <<p.tauGrad << ")\n"
               << "    Combination of weights is '" << COMB
               << "' (recompile to change it)\n\n"
               << "Occlusion detection:\n"
@@ -97,12 +97,12 @@ int main(int argc, char *argv[]) {
     CmdLine cmd;
 
     ParamDisparity paramD; // Parameters for adaptive weights
-    cmd.add( make_option('R',paramD.window_radius) );
+    cmd.add( make_option('R',paramD.radius) );
     cmd.add( make_option('A',paramD.alpha) );
-    cmd.add( make_option('t',paramD.color_threshold) );
-    cmd.add( make_option('g',paramD.gradient_threshold) );
-    cmd.add( make_option(0,paramD.gamma_c,"gcol") );
-    cmd.add( make_option(0,paramD.gamma_p,"gpos") );
+    cmd.add( make_option('t',paramD.tauCol) );
+    cmd.add( make_option('g',paramD.tauGrad) );
+    cmd.add( make_option(0,paramD.gammaCol,"gcol") );
+    cmd.add( make_option(0,paramD.gammaPos,"gpos") );
 
     ParamOcclusion paramOcc; // Parameters for filling occlusions
     cmd.add( make_option('o',paramOcc.tol_disp) ); // Detect occlusion
