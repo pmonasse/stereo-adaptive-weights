@@ -1,7 +1,12 @@
 Bilaterally Weighted Patches for Disparity Map Computation.
 
-Laura F. Julià, <fernandl@imagine.enpc.fr>, Univ. Paris Est, LIGM, ENPC, France
+Laura F. Julia, <fernandl@imagine.enpc.fr>, Univ. Paris Est, LIGM, ENPC, France
 Pascal Monasse, <monasse@imagine.enpc.fr>, Univ. Paris Est, LIGM, ENPC, France
+
+Version 1.0-rc1 released on 2014/08/29
+
+Future releases and updates:
+https://github.com/pmonasse/stereo-adaptive-weights.git
 
 - Build
 Prerequisites: CMake version 2.6 or later

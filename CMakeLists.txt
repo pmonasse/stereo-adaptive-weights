@@ -95,3 +95,6 @@ if(UNIX)
     set_target_properties(tiff2png PROPERTIES
                           COMPILE_FLAGS "-Wall -Wextra -Werror")
 endif(UNIX)
+if(MSVC)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS)
+endif(MSVC)

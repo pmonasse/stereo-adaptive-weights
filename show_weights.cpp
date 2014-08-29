@@ -101,7 +101,7 @@ float weight(const Image& im, int x, int y, int dx, int dy, float gammaCol) {
 Image show_weights(const Image& im1, const Image& im2, int xp, int yp, int xq,
                    Comb* comb, int r, float gammaCol, float gammaPos) {
     Image W(2*r+1,2*r+1);
-    std::fill_n(&W(0,0), W.width()*W.height(), 0);
+    std::fill_n(&W(0,0), W.width()*W.height(), 0.0f);
     int w1=im1.width(), h1=im1.height();
     int w2=im2.width(), h2=im2.height();
     const float f = (comb? 2.0f: 1.0f);

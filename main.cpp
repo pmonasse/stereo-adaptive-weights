@@ -151,9 +151,9 @@ int main(int argc, char *argv[]) {
 
     // Create disparity images
     Image disp1(width,height);
-    std::fill_n(&disp1(0,0), width*height, dMin-1);
+    std::fill_n(&disp1(0,0), width*height, static_cast<float>(dMin-1));
     Image disp2(width,height);
-    std::fill_n(&disp2(0,0), width*height, dMin-1);
+    std::fill_n(&disp2(0,0), width*height, static_cast<float>(dMin-1));
 
     // Compute disparity using adaptive weights.
     disparityAW(im1, im2, dMin, dMax, paramD,disp1,disp2);

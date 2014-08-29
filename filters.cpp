@@ -114,7 +114,7 @@ float Image::dist2(int x1,int y1, int x2,int y2) const {
 void Image::weighted_histo(std::vector<float>& tab, int x, int y, int radius,
                            int vMin, const Image& guidance,
                            float sSpace, float sColor) const {
-    std::fill(tab.begin(), tab.end(), 0);
+    std::fill(tab.begin(), tab.end(), 0.0f);
     for(int dy=-radius; dy<=radius; dy++)
         if(0<=y+dy && y+dy<h)
             for(int dx=-radius; dx<=radius; dx++)

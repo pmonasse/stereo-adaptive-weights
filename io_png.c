@@ -38,13 +38,12 @@
 #include <string.h>
 #include <math.h>
 #include <limits.h>
-#include "png.h"
 
 /* option to use a local version of the libpng */
 #ifdef IO_PNG_LOCAL_LIBPNG
 #include "png.h"
 #else
-#include "png.h"
+#include <png.h>
 #endif
 
 /* ensure consistency */
@@ -501,7 +500,7 @@ float *io_png_read_f32_gray(const char *fname, size_t * nxp, size_t * nyp)
         while (ptr_gray < ptr_end)
             *ptr_gray++ = rgb_to_gray(*ptr_r++, *ptr_g++, *ptr_b++);
         /* resize and return the image */
-        img = realloc(img, *nxp * *nyp * sizeof(float));
+        img = (float*)realloc(img, *nxp * *nyp * sizeof(float));
         return img;
     }
 }
@@ -679,7 +678,7 @@ static int io_png_write_raw(const char *fname, const void *data,
                 /* row loop */
                 for (i = 0; i < nx; i++) {
                     /* pixel loop */
-                    tmp = floor(*data_f32_ptr++ + .5);
+                    tmp = (float)floor(*data_f32_ptr++ + .5f);
                     *idata_ptr = (png_byte) (tmp < 0. ? 0. :
                                              (tmp > 255. ? 255. : tmp));
                     idata_ptr += nc;
