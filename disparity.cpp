@@ -4,7 +4,7 @@
  * @author Laura F. Julia <fernandl@imagine.enpc.fr>
  *         Pascal Monasse <monasse@imagine.enpc.fr>
  *
- * Copyright (c) 2014, Laura F. Julia, Pascal Monasse
+ * Copyright (c) 2014-2015, Laura F. Julia, Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -20,6 +20,7 @@
 #include "image.h"
 #include <algorithm>
 #include <limits>
+#include <iostream>
 #include <cmath>
 #include <cassert>
 
@@ -38,6 +39,37 @@
 #else
 #error "Unknown combination of weights"
 #endif
+
+/// Check that all parameters have a reasonable value.
+bool ParamDisparity::check() const {
+    bool ok=true;
+    if(tauCol<0) {
+        std::cerr << "Error: Threshold of color difference must be positive";
+        ok = false;
+    }
+    if(tauGrad<0) {
+        std::cerr << "Error: Threshold of gradient difference must be positive";
+        ok = false;
+    }
+    if(alpha<0 || 1.0f<alpha) {
+        std::cerr << "Error: alpha must be in interval [0,1]";
+        ok = false;
+    }
+    if(gammaCol<=0) {
+        std::cerr << "Error: gamma_col must be positive";
+        ok = false;
+    }
+    if(gammaPos<=0) {
+        std::cerr << "Error: gamma_pos must be positive";
+        ok = false;
+    }
+    if(radius<0) {
+        std::cerr << "Error: radius of patch must be positive";
+        ok = false;
+    }
+    if(!ok) std::cout << std::endl;
+    return ok;
+}
 
 /// Computes image of raw matching costs e at disparity d.
 ///

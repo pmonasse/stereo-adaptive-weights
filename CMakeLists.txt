@@ -12,7 +12,7 @@ find_package(PNG)
 find_package(TIFF)
 
 if(NOT PNG_FOUND)
-    add_subdirectory(third_party/libpng-1.6.12)
+    add_subdirectory(third_party/libpng-1.6.16)
     include_directories(${PNG_INCLUDE_DIRS})
 endif(NOT PNG_FOUND)
 

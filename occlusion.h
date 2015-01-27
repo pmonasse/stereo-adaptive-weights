@@ -4,7 +4,7 @@
  * @author Pauline Tan <pauline.tan@ens-cachan.fr>
  *         Pascal Monasse <monasse@imagine.enpc.fr>
  *
- * Copyright (c) 2012-2013, Pauline Tan, Pascal Monasse
+ * Copyright (c) 2012-2015, Pauline Tan, Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -34,6 +34,8 @@ struct ParamOcclusion {
       sigma_space(9),
       sigma_color(255*0.1f),
       median_radius(9) {}
+
+    bool check() const;
 };
 
 void detect_occlusion(Image& disparityLeft, const Image& disparityRight,

@@ -4,7 +4,7 @@
  * @author Pauline Tan <pauline.tan@ens-cachan.fr>
  *         Pascal Monasse <monasse@imagine.enpc.fr>
  *
- * Copyright (c) 2012-2013, Pauline Tan, Pascal Monasse
+ * Copyright (c) 2012-2015, Pauline Tan, Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -18,7 +18,31 @@
 
 #include "occlusion.h"
 #include "image.h"
+#include <iostream>
 #include <cstdlib>
+
+/// Check all parameters have a reasonable value
+bool ParamOcclusion::check() const {
+    bool ok=true;
+    if(tol_disp<0) {
+        std::cerr << "Error: Tolerance for disp. difference must be positive";
+        ok = false;
+    }
+    if(sigma_space<=0) {
+        std::cerr << "Error: sigma_space must be positive";
+        ok = false;
+    }
+    if(sigma_color<=0) {
+        std::cerr << "Error: sigma_color must be positive";
+        ok = false;
+    }
+    if(median_radius<0) {
+        std::cerr << "Error: Median radius must be positive";
+        ok = false;
+    }
+    if(!ok) std::cout << std::endl;
+    return ok;
+}
 
 /// Detect left-right discrepancies in disparity and put incoherent pixels to
 /// value \a dOcclusion in \a disparityLeft.

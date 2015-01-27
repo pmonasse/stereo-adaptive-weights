@@ -4,7 +4,7 @@
  * @author Laura F. Julia <fernandl@imagine.enpc.fr>
  *         Pascal Monasse <monasse@imagine.enpc.fr>
  *
- * Copyright (c) 2014, Laura F. Julia, Pascal Monasse
+ * Copyright (c) 2014-2015, Laura F. Julia, Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -26,8 +26,8 @@ struct ParamDisparity {
     float tauCol;   ///< Max cost for color difference term
     float tauGrad;  ///< Max cost for gradient difference term
     float alpha;    ///< Balance between color/gradient difference
-	float gammaCol; ///< Weight of color similarity (higher means less weight)
-	float gammaPos; ///< Weight for position (higher means less weight)
+    float gammaCol; ///< Weight of color similarity (higher means less weight)
+    float gammaPos; ///< Weight for position (higher means less weight)
     int radius;     ///< Radius r of window, size is (2*r+1)x(2*r+1)
 
     // Constructor with default parameters
@@ -35,9 +35,11 @@ struct ParamDisparity {
     : tauCol(30),
       tauGrad(2),
       alpha(0.9f),
-	  gammaCol(12),
-	  gammaPos(17.5f),
+      gammaCol(12),
+      gammaPos(17.5f),
       radius(17) {}
+
+    bool check() const;
 };
 
 void disparityAW(Image im1, Image im2, int dMin, int dMax,

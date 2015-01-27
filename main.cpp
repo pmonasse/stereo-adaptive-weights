@@ -4,7 +4,7 @@
  * @author Laura F. Julia <fernandl@imagine.enpc.fr>
  *         Pascal Monasse <monasse@imagine.enpc.fr>
  *
- * Copyright (c) 2014, Laura F. Julia, Pascal Monasse
+ * Copyright (c) 2014-2015, Laura F. Julia, Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -121,6 +121,9 @@ int main(int argc, char *argv[]) {
         usage(argv[0]);
         return 1;
     }
+
+    if(!paramD.check() || !paramOcc.check())
+        return 1;
 
     if(sense != 0 && sense != 1) {
         std::cerr << "Error: invalid camera motion direction " << sense
