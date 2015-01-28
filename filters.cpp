@@ -4,7 +4,7 @@
  * @author Pauline Tan <pauline.tan@ens-cachan.fr>
  *         Pascal Monasse <monasse@imagine.enpc.fr>
  *
- * Copyright (c) 2012-2014, Pauline Tan, Pascal Monasse
+ * Copyright (c) 2012-2015, Pauline Tan, Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -85,7 +85,10 @@ Image Image::median(int radius) const {
                         for(int i=-radius; i<=radius; i++)
                             if(0<=i+x && i+x<w)
                                 v[n++] = (*this)(i+x,j+y,k);
-                std::nth_element(v, v+n/2, v+n);
+                // Following line should be used instead of full sort.
+                // However, because of bug #58800 of g++ 4.8.2, we avoid it.
+                // std::nth_element(v, v+n/2, v+n);
+                std::sort(v, v+n);
                 M(x,y,k) = v[n/2];
             }
     delete [] v;

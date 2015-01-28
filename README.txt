@@ -3,7 +3,7 @@ Bilaterally Weighted Patches for Disparity Map Computation.
 Laura F. Julia, <fernandl@imagine.enpc.fr>, Univ. Paris Est, LIGM, ENPC, France
 Pascal Monasse, <monasse@imagine.enpc.fr>, Univ. Paris Est, LIGM, ENPC, France
 
-Version 1.0-rc2 released on 2015/01/27
+Version 1.0-rc2 released on 2015/01/29
 
 Future releases and updates:
 https://github.com/pmonasse/stereo-adaptive-weights.git
@@ -37,8 +37,9 @@ Densification:
     -s sigmas: value of sigma_space (9)
 
 The parameter 'sense' used in densification is the direction of camera motion:
-    - from left to right (value '0'), common for Middlebury pairs
+    - from left to right (value '0', default), common for Middlebury pairs
     - from right to left (value '1')
+    - other value: no densification.
 
 - Output image files
 The optional string 'out_prefix' (default: 'disparity') is the prefix used for the output images. The 3 output images are in float TIFF format:
@@ -83,6 +84,9 @@ Options:
     -m,--min grayMin: gray level for vMin (255)
     -M,--max grayMax: gray level for vMax (0)
 This outputs a color 8-bit PNG image, applying an affine map between points (vMin,grayMin) and (vMax,grayMax). Pixels are gray except NaN input values or values outside the range [vMin,vMax] are in cyan color.
+
+- Note
+There is a known bug (#58800) in g++ 4.8.2 in function std::nth_element in Image::median (filters.cpp). This is fixed in Ubuntu 14.04, but other systems may be vulnerable (for example MinGW-4.8.2). This provokes a memory error and is a security hazard. The adopted solution is to use std::sort, with a tiny bit longer computation time.
 
 - Files (Only those with * are reviewed)
 disparity.cpp (*)

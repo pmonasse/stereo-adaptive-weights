@@ -82,14 +82,14 @@ find_package(OpenMP)
 if(OPENMP_FOUND)
     set_target_properties(stereoAdaptiveWeights PROPERTIES
                           COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
+    if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+        set(CMAKE_EXE_LINKER_FLAGS ${OpenMP_CXX_FLAGS})
+    endif(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 endif(OPENMP_FOUND)
 
 if(UNIX)
     set_target_properties(stereoAdaptiveWeights PROPERTIES
                           COMPILE_FLAGS "-Wall -Wextra -Werror ${OpenMP_CXX_FLAGS}")
-    if(OPENMP_FOUND)
-        set(CMAKE_EXE_LINKER_FLAGS ${OpenMP_CXX_FLAGS})
-    endif(OPENMP_FOUND)
     set_target_properties(show_weights PROPERTIES
                           COMPILE_FLAGS "-Wall -Wextra -Werror")
     set_target_properties(tiff2png PROPERTIES

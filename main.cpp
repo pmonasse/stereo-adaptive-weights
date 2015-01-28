@@ -125,12 +125,6 @@ int main(int argc, char *argv[]) {
     if(!paramD.check() || !paramOcc.check())
         return 1;
 
-    if(sense != 0 && sense != 1) {
-        std::cerr << "Error: invalid camera motion direction " << sense
-                  << " (must be 0 or 1)" << std::endl;
-        return 1;
-    }
-
     // Load images
     Image im1 = loadImage(argv[1]);
     Image im2 = loadImage(argv[2]);
@@ -182,10 +176,14 @@ int main(int argc, char *argv[]) {
 
     // Fill occlusions (post-processing)
     Image dispDense = disp1.clone();
-    if(sense == 0)
-        dispDense.fillMaxX(static_cast<float>(dMin));
-    else
-        dispDense.fillMinX(static_cast<float>(dMin));
+    switch(sense) {
+    case 0:
+        dispDense.fillMaxX(static_cast<float>(dMin)); break;
+    case 1:
+        dispDense.fillMinX(static_cast<float>(dMin)); break;
+    default:
+        return 0; // No densification
+    }
     fill_occlusion(dispDense, im1.median(1), disp1, dMin, dMax, paramOcc);
     if(! save_disparity(outFile3.c_str(), disp1, dMin,dMax)) {
         std::cerr << "Error writing file " << outFile3 << std::endl;
