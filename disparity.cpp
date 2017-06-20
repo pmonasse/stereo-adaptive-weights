@@ -137,6 +137,9 @@ static Image* costVolume(const Image& im1, const Image& im2,
 static void support(const Image& im, int xp, int yp, int r,
                     float* distC, Image& w) {
     const int width=im.width(), height=im.height(), c=im.channels();
+    assert(0<=yp && yp<height);
+    if(!  (0<=xp && xp<width))
+        return;
     for(int y=-r; y<=r; y++)
         if(0<=yp+y && yp+y<height)
             for(int x=-r; x<=r; x++)
