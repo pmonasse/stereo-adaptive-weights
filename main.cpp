@@ -33,43 +33,6 @@ static const char* SUFFIX3="_pp.tif";  ///< Suffix for output 3: post_processed
 #error "The macro COMB must be set to one of the allowed values at compilation"
 #endif
 
-/// Usage description
-static void usage(const char* name) {
-    ParamDisparity p;
-    ParamOcclusion q;
-    std::cerr <<"Bilaterally weighted patches for disparity map computation.\n"
-              << "Usage: " << name
-              << " [options] im1.png im2.png dmin dmax [out_prefix]\n\n"
-              << "Options (default values in parentheses)\n"
-              << "Adaptive weights parameters:\n"
-              << "    --gcol gamma_col: gamma for color difference ("
-              <<p.gammaCol<<")\n"
-              << "    --gpos gamma_pos: gamma for spatial distance ("
-              <<p.gammaPos<<")\n"
-              << "    -R radius: radius of patch window ("
-              <<p.radius << ")\n"
-              << "    -A alpha: value of alpha for matching cost ("
-              <<p.alpha<<")\n"
-              << "    -t T: threshold of color difference in matching cost ("
-              <<p.tauCol<<")\n"
-              << "    -g G: threshold of gradient difference in matching cost ("
-              <<p.tauGrad << ")\n"
-              << "    Combination of weights is '" << COMB
-              << "' (recompile to change it)\n\n"
-              << "Occlusion detection:\n"
-              << "    -o tolDiffDisp: tolerance for left-right disp. diff. ("
-              <<q.tol_disp << ")\n\n"
-              << "Densification:\n"
-              << "    -O sense: camera sense='0':right, '1':left (0)\n"
-              << "    -r radius: radius of the weighted median filter ("
-              <<q.median_radius << ")\n"
-              << "    -c sigmac: value of sigma_color ("
-              <<q.sigma_color << ")\n"
-              << "    -s sigmas: value of sigma_space ("
-              <<q.sigma_space << ")"
-              << std::endl;
-}
-
 /// Load color image
 Image loadImage(const char* name) {
     size_t width, height;
@@ -95,21 +58,37 @@ Image loadImage(const char* name) {
 int main(int argc, char *argv[]) {
     int sense=0; // Camera motion direction: '0'=to-right, '1'=to-left
     CmdLine cmd;
+    cmd.prefixDoc = "    ";
+    const std::string sec1("Adaptive weights parameters:"),
+        sec2("Occlusion detection:"), sec3("Densification:");
 
     ParamDisparity paramD; // Parameters for adaptive weights
-    cmd.add( make_option('R',paramD.radius) );
-    cmd.add( make_option('A',paramD.alpha) );
-    cmd.add( make_option('t',paramD.tauCol) );
-    cmd.add( make_option('g',paramD.tauGrad) );
-    cmd.add( make_option(0,paramD.gammaCol,"gcol") );
-    cmd.add( make_option(0,paramD.gammaPos,"gpos") );
+    cmd.section = sec1;
+    cmd.add( make_option(0,paramD.gammaCol,"gcol")
+             .doc("gamma for color difference") );
+    cmd.add( make_option(0,paramD.gammaPos,"gpos")
+             .doc("gamma for spatial distance") );
+    cmd.add( make_option('R',paramD.radius).doc("radius of patch window") );
+    cmd.add( make_option('A',paramD.alpha)
+             .doc("value of alpha for matching cost") );
+    cmd.add( make_option('t',paramD.tauCol)
+             .doc("threshold of color difference in matching cost") );
+    cmd.add( make_option('g',paramD.tauGrad)
+             .doc("threshold of gradient difference in matching cost") );
 
     ParamOcclusion paramOcc; // Parameters for filling occlusions
-    cmd.add( make_option('o',paramOcc.tol_disp) ); // Detect occlusion
-    cmd.add( make_option('O',sense) ); // Fill occlusion
-    cmd.add( make_option('r',paramOcc.median_radius) );
-    cmd.add( make_option('c',paramOcc.sigma_color) );
-    cmd.add( make_option('s',paramOcc.sigma_space) );
+    cmd.section = sec2;
+    cmd.add( make_option('o',paramOcc.tol_disp)
+             .doc("tolerance for left-right disp. diff.") ); // Detect occlusion
+    cmd.section = sec3;
+    cmd.add( make_option('O',sense)
+             .doc("camera sense='0':right, '1':left") ); // Fill occlusion
+    cmd.add( make_option('r',paramOcc.median_radius)
+             .doc("radius of the weighted median filter") );
+    cmd.add( make_option('c',paramOcc.sigma_color)
+             .doc("value of sigma_color") );
+    cmd.add( make_option('s',paramOcc.sigma_space)
+             .doc("value of sigma_space") );
 
     try {
         cmd.process(argc, argv);
@@ -118,7 +97,15 @@ int main(int argc, char *argv[]) {
         argc=1; // To display usage
     }
     if(argc!=5 && argc!=6) {
-        usage(argv[0]);
+        std::cerr <<"Bilaterally weighted patches for disparity map computation"
+                  << "\nUsage: " << argv[0]
+                  << " [options] im1.png im2.png dmin dmax [out_prefix]\n\n"
+                  << "Options (default values in parentheses)\n";
+        std::cerr << sec1 << '\n' << CmdLine(cmd, sec1);
+        std::cerr << cmd.prefixDoc << "Combination of weights is '" << COMB
+                  << "' (recompile to change it)\n\n";
+        std::cerr << sec2 << '\n' << CmdLine(cmd, sec2) << '\n';
+        std::cerr << sec3 << '\n' << CmdLine(cmd, sec3);
         return 1;
     }
 

@@ -3,7 +3,7 @@
  * @brief Command line option parsing
  * @author Pascal Monasse
  * 
- * Copyright (c) 2012 Pascal Monasse
+ * Copyright (c) 2012-2016 Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -26,6 +26,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <sstream>
 #include <cassert>
@@ -37,16 +38,29 @@
 /// Base class for option/switch
 class Option {
 public:
-    char c; ///< Option letter (eg 's' for option -s)
+    char c; ///< Option letter (eg 's' for -s), 0 if you want only a long name
     bool used; ///< Does the command line use that option?
-    std::string longName; /// Optional long name (eg "switch" for --switch)
+    std::string longName; ///< Optional long name (eg "switch" for --switch)
+    std::string desc; ///< Description
+    std::string section; ///< Options can be sorted by section
 
     /// Constructor with short name/long name
     Option(char d, std::string name)
     : c(d), used(false), longName(name) {}
     virtual ~Option() {}
+    const std::string& doc() const { return desc; }
+    virtual void print(std::ostream& str) const {
+        if(c)
+            str << '-' << c << (longName.empty()? "": ", ");
+        if(! longName.empty())
+            str << "--" << longName;
+    }
+    Option& doc(const std::string& description)
+    { desc=description; return *this;}
     virtual bool check(int& argc, char* argv[])=0; ///< Option found at argv[0]?
     virtual Option* clone() const=0; ///< Copy
+    /// Print value of option
+    virtual std::string printValue() const { return std::string(); }
 };
 
 /// Option on/off is called a switch
@@ -73,7 +87,7 @@ public:
     }
     /// Copy
     Option* clone() const {
-        return new OptionSwitch(c, longName);
+        return new OptionSwitch(*this);
     }
 };
 
@@ -102,8 +116,7 @@ public:
             param=std::string(argv[0]).substr(size); arg=1;
         }
         if(arg>0) {
-            std::stringstream str(param); char unused;
-            if((str >> _field).fail() || !(str>>unused).fail())
+            if(! read_param(param))
                 throw std::string("Unable to interpret ")
                     +param+" as argument of "+argv[0];
             used = true;
@@ -113,13 +126,58 @@ public:
         }
         return false;
     }
+    /// Decode the string as template type T
+    bool read_param(const std::string& param) {
+        std::stringstream str(param); char unused;
+        return !((str >> _field).fail() || !(str>>unused).fail());
+    }
+    /// Indicate that an argument is required
+    void print(std::ostream& str) const {
+        Option::print(str);
+        str << (longName.empty()? ' ': '=') << "ARG";
+    }
+    std::string printValue() const {
+        std::stringstream s;
+        s << _field;
+        return s.str();
+    }
     /// Copy
     Option* clone() const {
-        return new OptionField<T>(c, _field, longName);
+        return new OptionField<T>(*this);
     }
 private:
     T& _field; ///< Reference to variable where to store the value
 };
+
+/// Template specialization to declare a switch like an option, storing result
+/// in the variable.
+template <>
+inline bool OptionField<bool>::check(int& argc, char* argv[]) {
+    bool res = OptionSwitch(c,longName).check(argc, argv);
+    if(res)
+        _field = true;
+    return res;
+}
+
+/// Specialisation for a switch, no argument to print.
+template<>
+void OptionField<bool>::print(std::ostream& str) const {
+    Option::print(str);    
+}
+
+/// Specialisation for a switch, no argument to print.
+template<>
+std::string OptionField<bool>::printValue() const {
+    return Option::printValue();
+}
+
+/// Template specialization to be able to take parameter including space.
+/// Generic method would do >>_field (stops at space) and signal unused chars.
+template <>
+inline bool OptionField<std::string>::read_param(const std::string& param) {
+    _field = param;
+    return true;
+}
 
 /// New switch option
 OptionSwitch make_switch(char c, std::string name="") {
@@ -132,10 +190,29 @@ OptionField<T> make_option(char c, T& field, std::string name="") {
     return OptionField<T>(c, field, name);
 }
 
+/// Utility function to sort options by section
+static bool order_by_section(Option*const o1, Option*const o2) {
+    return (o1->section < o2->section);
+}
+
 /// Command line parsing
 class CmdLine {
     std::vector<Option*> opts;
 public:
+    std::string prefixDoc; ///< For example, a tabulation for each line of doc
+    int alignDoc; ///< Column where option description starts
+    bool showDefaults; ///< Show default values of options
+    std::string section; ///< Section where to put next added options
+    /// Constructor
+    CmdLine(): alignDoc(0), showDefaults(true) {}
+    CmdLine(const CmdLine& cmd, const std::string& sect) {
+        *this = cmd;
+        opts.clear();
+        for(std::vector<Option*>::const_iterator it=cmd.opts.begin();
+            it!=cmd.opts.end(); ++it)
+            if((*it)->section == sect)
+                opts.push_back( (*it)->clone() );
+    }
     /// Destructor
     ~CmdLine() {
         std::vector<Option*>::iterator it=opts.begin();
@@ -144,7 +221,9 @@ public:
     }
     /// Add an option
     void add(const Option& opt) {
-        opts.push_back( opt.clone() );
+        Option* c = opt.clone();
+        c->section = section;
+        opts.push_back(c);
     }
     /// Parse of command line acting as a filter. All options are virtually
     /// removed from the command line.
@@ -177,6 +256,32 @@ public:
                 ++i;
             }
         }
+        // Order options by section, useful if print is called after
+        std::stable_sort(opts.begin(), opts.end(), order_by_section);
+    }
+    /// Output options.
+    void print(std::ostream& str) const {
+        if(opts.empty()) return;
+        std::string prevSection = opts.back()->section;
+        bool showSection = (opts.front()->section != prevSection);
+        std::vector<Option*>::const_iterator it=opts.begin();
+        for(; it != opts.end(); ++it) {
+            if(showSection && prevSection!=(*it)->section)
+                str << (prevSection=(*it)->section) << std::endl;
+            std::stringstream ss;
+            ss << prefixDoc;
+            (*it)->print(ss);
+            ss << ' ';
+            std::string d = ss.str();
+            str << d;
+            if((int)d.size() < alignDoc)
+                std::fill_n(std::ostream_iterator<char>(str),
+                            alignDoc-d.size(), ' ');
+            str << (*it)->desc;
+            if(showDefaults && !(*it)->printValue().empty())
+                str << " (" << (*it)->printValue() << ')';
+            str << std::endl;
+        }
     }
     /// Was the option used in last parsing?
     bool used(char c) const {
@@ -188,5 +293,11 @@ public:
         return false;
     }
 };
+
+/// Output possible options.
+std::ostream& operator<<(std::ostream& str, const CmdLine& cmd) {
+    cmd.print(str);
+    return str;
+}
 
 #endif

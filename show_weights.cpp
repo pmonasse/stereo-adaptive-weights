@@ -45,29 +45,6 @@ static float left(float a, float) {
     return a;
 }
 
-/// Usage Description
-static void usage(const char* name) {
-    ParamDisparity p; // Parameters for adaptive weights
-	std::cerr <<"Show weights\n"
-              << "Usage: " << name
-              << " [options] im1.png x y out.png [im2.png disp]\n"
-              << "Options (default values in parentheses)\n"
-              << "Adaptive weights parameters:\n"
-              << "    -R radius: radius of the window patch ("
-              <<p.radius << ")\n"
-              << "    --gcol gamma_c: gamma for color similarity ("
-              <<p.gammaCol << ")\n"
-              << "    --gpos gamma_p: gamma for distance ("
-              <<p.gammaPos << ")\n"
-              << "    -c: weights combination (mult)\n\n"
-              << "Weights combination choice (relevant only with im2.png):\n"
-              << "    - 'max': max(w1,w2)\n"
-              << "    - 'min': min(w1,w2)\n"
-              << "    - 'mult': w1*w2\n"
-              << "    - 'plus': w1+w2"
-              << std::endl;
-}
-
 /// Load color image
 Image loadImage(const char* name) {
     size_t width, height;
@@ -134,14 +111,14 @@ void rescale(Image& w) {
 /// Main Program
 int main(int argc, char *argv[])
 {
-	CmdLine cmd;
+	CmdLine cmd; cmd.prefixDoc="    ";
 
     std::string combine;
     ParamDisparity p; // Parameters for adaptive weights
-    cmd.add( make_option('R',p.radius) );
-    cmd.add( make_option(0,p.gammaCol,"gcol") );
-    cmd.add( make_option(0,p.gammaPos,"gpos") );
-	cmd.add( make_option('c', combine) );
+    cmd.add( make_option('R',p.radius).doc("radius of the window patch") );
+    cmd.add(make_option(0,p.gammaCol,"gcol").doc("gamma for color similarity"));
+    cmd.add( make_option(0,p.gammaPos,"gpos").doc("gamma for distance") );
+	cmd.add( make_option('c', combine).doc("weights combination (see below)") );
 
 	try {
 		cmd.process(argc, argv);
@@ -150,7 +127,18 @@ int main(int argc, char *argv[])
         argc = 1; // To display usage
 	}
 	if(argc!=5 && argc!=7) {
-		usage(argv[0]);
+        std::cerr <<"Show weights\n"
+                  << "Usage: " << argv[0]
+                  << " [options] im1.png x y out.png [im2.png disp]\n"
+                  << "Options (default values in parentheses)\n"
+                  << "Adaptive weights parameters:\n" << cmd << '\n';
+        std::cerr << "Weights combination choice (relevant only with im2.png):"
+                  << '\n'
+                  << cmd.prefixDoc << "- 'max': max(w1,w2)\n"
+                  << cmd.prefixDoc << "- 'min': min(w1,w2)\n"
+                  << cmd.prefixDoc<< "- 'mult': w1*w2\n"
+                  << cmd.prefixDoc<< "- 'plus': w1+w2"
+                  << std::endl;
 		return 1;
 	}
 

@@ -29,9 +29,9 @@
 /// Values outside [vMin,vMax] are assumed invalid and written in cyan color.
 int main(int argc, char *argv[]) {
     int grayMin=255, grayMax=0;
-    CmdLine cmd;
-    cmd.add( make_option('m',grayMin,"min") );
-    cmd.add( make_option('M',grayMax,"max") );
+    CmdLine cmd; cmd.prefixDoc="    ";
+    cmd.add( make_option('m',grayMin,"min").doc("gray level for vMin") );
+    cmd.add( make_option('M',grayMax,"max").doc("gray level for vMax") );
 
     try {
         cmd.process(argc, argv);
@@ -42,10 +42,7 @@ int main(int argc, char *argv[]) {
     if(argc!=5) {
         std::cerr << "Usage: "<< argv[0]
                   << " [options] in.tif vMin vMax out.png\n"
-                  << "Options:\n"
-                  << "    -m,--min grayMin: gray level for vMin (255)\n"
-                  << "    -M,--max grayMax: gray level for vMax (0)"
-                  << std::endl;
+                  << "Options:\n" << cmd;
         return 1;
     }
 
