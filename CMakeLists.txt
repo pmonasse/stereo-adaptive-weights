@@ -1,30 +1,35 @@
-cmake_minimum_required(VERSION 2.6)
-
-# zlib is needed by libPNG and also by libTIFF, even though the cmake module for
-# libTIFF does not specify that
-find_package(ZLIB)
-if(NOT ZLIB_FOUND)
-  add_subdirectory(third_party/zlib-1.2.8)
-endif(NOT ZLIB_FOUND)
-include_directories(${ZLIB_INCLUDE_DIRS})
+cmake_minimum_required(VERSION 2.8)
 
 find_package(PNG)
 find_package(TIFF)
 
-if(NOT PNG_FOUND)
-    add_subdirectory(third_party/libpng-1.6.16)
-    include_directories(${PNG_INCLUDE_DIRS})
-endif(NOT PNG_FOUND)
+if(NOT PNG_FOUND OR NOT TIFF_FOUND)
+    find_package(ZLIB) # zlib is needed by libPNG and by libTIFF
+    if(NOT ZLIB_FOUND)
+        add_subdirectory(third_party/zlib-1.2.11)
+        set(ZLIB_FOUND TRUE)
+    endif()
+    include_directories(${ZLIB_INCLUDE_DIRS})
 
-if(NOT TIFF_FOUND)
-    find_package(JPEG)
-    if(NOT JPEG_FOUND)
-        add_subdirectory(third_party/jpeg-9a)
-    endif(NOT JPEG_FOUND)
-    include_directories(${JPEG_INCLUDE_DIR})
-    add_subdirectory(third_party/tiff-4.0.3)
-    include_directories(${TIFF_INCLUDE_DIR})
-endif(NOT TIFF_FOUND)
+    if(NOT PNG_FOUND)
+        set(SKIP_INSTALL_ALL 1)
+        add_subdirectory(third_party/libpng-1.6.30)
+    endif()
+
+    if(NOT TIFF_FOUND)
+        find_package(JPEG)
+        if(NOT JPEG_FOUND)
+            add_subdirectory(third_party/jpeg-9b)
+            set(JPEG_FOUND TRUE)
+        endif()
+        include_directories(${JPEG_INCLUDE_DIR})
+        add_subdirectory(third_party/tiff-4.0.8)
+    endif()
+endif()
+
+add_definitions(${PNG_DEFINITIONS})
+include_directories(${PNG_INCLUDE_DIRS})
+include_directories(${TIFF_INCLUDE_DIR})
 
 set(SRC
     cmdLine.h
