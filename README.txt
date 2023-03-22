@@ -115,3 +115,4 @@ README.txt (this document)
 *1.0: initial release
 *1.1: fix out of bounds read
 *1.2: upgrade third party libraries
+*1.3: upgrade third party libraries, fix build issues
