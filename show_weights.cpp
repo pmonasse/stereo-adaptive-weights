@@ -1,20 +1,20 @@
 /**
- * @file show_weights.cpp
- * @brief Computation of adaptive  (bilateral) weights in a square window
- * @author Laura F. Julia <fernandl@imagine.enpc.fr>
- *         Pascal Monasse <monasse@imagine.enpc.fr>
- *
- * Copyright (c) 2014, Laura F. Julia, Pascal Monasse
- * All rights reserved.
- *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * You should have received a copy of the GNU General Pulic License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+* @file show_weights.cpp
+* @brief Computation of adaptive  (bilateral) weights in a square window
+* @author Laura F. Julia <fernandl@imagine.enpc.fr>
+*         Pascal Monasse <monasse@imagine.enpc.fr>
+*
+* Copyright (c) 2014, Laura F. Julia, Pascal Monasse
+* All rights reserved.
+*
+* This program is free software: you can redistribute it and/or modify it
+* under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* You should have received a copy of the GNU General Pulic License
+* along with this program. If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include "disparity.h"
 #include "image.h"
@@ -111,22 +111,22 @@ void rescale(Image& w) {
 /// Main Program
 int main(int argc, char *argv[])
 {
-	CmdLine cmd; cmd.prefixDoc="    ";
+    CmdLine cmd; cmd.prefixDoc="    ";
 
     std::string combine;
     ParamDisparity p; // Parameters for adaptive weights
     cmd.add( make_option('R',p.radius).doc("radius of the window patch") );
     cmd.add(make_option(0,p.gammaCol,"gcol").doc("gamma for color similarity"));
     cmd.add( make_option(0,p.gammaPos,"gpos").doc("gamma for distance") );
-	cmd.add( make_option('c', combine).doc("weights combination (see below)") );
+    cmd.add( make_option('c', combine).doc("weights combination (see below)") );
 
-	try {
-		cmd.process(argc, argv);
-	} catch(std::string str) {
-		std::cerr << "Error: " << str << std::endl<<std::endl;
+    try {
+        cmd.process(argc, argv);
+    } catch(std::string str) {
+        std::cerr << "Error: " << str << std::endl<<std::endl;
         argc = 1; // To display usage
-	}
-	if(argc!=5 && argc!=7) {
+    }
+    if(argc!=5 && argc!=7) {
         std::cerr <<"Show weights\n"
                   << "Usage: " << argv[0]
                   << " [options] im1.png x y out.png [im2.png disp]\n"
@@ -139,8 +139,8 @@ int main(int argc, char *argv[])
                   << cmd.prefixDoc<< "- 'mult': w1*w2\n"
                   << cmd.prefixDoc<< "- 'plus': w1+w2"
                   << std::endl;
-		return 1;
-	}
+        return 1;
+    }
 
     // Load images
     Image im1 = loadImage(argv[1]);
@@ -148,18 +148,18 @@ int main(int argc, char *argv[])
     if(argc>5)
         im2 = loadImage(argv[5]);
 
-	int x,y;
-	if(! ((std::istringstream(argv[2])>>x).eof() &&
-		  (std::istringstream(argv[3])>>y).eof())) {
+    int x,y;
+    if(! ((std::istringstream(argv[2])>>x).eof() &&
+          (std::istringstream(argv[3])>>y).eof())) {
         std::cerr << "Error reading x or y" << std::endl;
         return 1;
-	}
+    }
 
-	int disp=0;
-	if(argc>6 && !((std::istringstream(argv[6])>>disp).eof()) ) {
+    int disp=0;
+    if(argc>6 && !((std::istringstream(argv[6])>>disp).eof()) ) {
         std::cerr << "Error reading disparity" << std::endl;
         return 1;
-	}
+    }
 
     Comb* comb=0;
     if(cmd.used('c') && im2.channels()!=0) {
@@ -188,5 +188,5 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-	return 0;
+    return 0;
 }
