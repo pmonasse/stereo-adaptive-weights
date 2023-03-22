@@ -3,7 +3,7 @@
  * @brief Command line option parsing
  * @author Pascal Monasse
  * 
- * Copyright (c) 2012-2016 Pascal Monasse
+ * Copyright (c) 2012-2017 Pascal Monasse
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -31,10 +31,6 @@
 #include <sstream>
 #include <cassert>
 
-#ifdef _WIN32
-#pragma warning(disable:4290) // exception specification ignored...
-#endif
-
 /// Base class for option/switch
 class Option {
 public:
@@ -48,13 +44,14 @@ public:
     Option(char d, std::string name)
     : c(d), used(false), longName(name) {}
     virtual ~Option() {}
-    const std::string& doc() const { return desc; }
+    /// Output the option identifier, short and/or long name
     virtual void print(std::ostream& str) const {
         if(c)
             str << '-' << c << (longName.empty()? "": ", ");
         if(! longName.empty())
             str << "--" << longName;
     }
+    /// Set the description of an option, same as assigning field \a desc
     Option& doc(const std::string& description)
     { desc=description; return *this;}
     virtual bool check(int& argc, char* argv[])=0; ///< Option found at argv[0]?
@@ -95,7 +92,7 @@ public:
 template <class T>
 class OptionField : public Option {
 public:
-    /// Constructor. The result with be stored in variable @field.
+    /// Constructor. The result with be stored in variable \c field.
     OptionField(char c, T& field, std::string name="")
     : Option(c,name), _field(field) {}
     /// Find option in argv[0] and argument in argv[1]. Throw an exception
@@ -195,7 +192,126 @@ static bool order_by_section(Option*const o1, Option*const o2) {
     return (o1->section < o2->section);
 }
 
-/// Command line parsing
+/// Command line parsing.
+///
+/// This class parses a command line into options and positional arguments. Its
+/// purpose is similar to
+///    - GNU getopt (https://www.gnu.org/software/libc/manual/html_node/Getopt.html)
+///    - Boost.Program_options (http://www.boost.org/doc/libs/1_58_0/doc/html/program_options.html)
+///
+/// but should be simpler to use (portable, single header file). An example:
+/// \code
+/// #include "cmdLine.h"
+/// int main(int argc, char* argv[]) {
+///     CmdLine cmd;
+///     bool help; int level=0;
+///     cmd.add( make_option('h', help, "help").doc("usage info") );
+///     cmd.add( make_option('l', level, "level").doc("integer level") );
+///     try {
+///         cmd.process(argc, argv);
+///     } catch(std::string str) {
+///         std::cerr << "Error: " << str << std::endl;
+///         return 1;
+///     }
+///     // After calling process, positional args are argv[1]...argv[argc-1]
+///     if(help)
+///         std::cout << "Usage: " << argv[0] << '\n' << cmd;
+///     std::cout << "Level argument is " << level << std::endl;
+///     return 0;
+/// }
+/// \endcode
+/// An instance of \c CmdLine is created, to which options are appended with
+/// method add. Two options are proposed here, the first one invoked by "-h"
+/// or "--help", the second one by "-l 2", '-l2', "--level 2", or "--level=2".
+/// \c make_option is the preferred way to create an option, because it detects
+/// the type of its variable and behaves appropriately: a \c bool indicates a
+/// switch (option without argument), any other type a regular option requiring
+/// a value. Non-standard types can be used, provided `operator<<` with
+/// an `std::ostream` and `operator>>` with an `std::istream` are defined.
+/// \note An option having no long name is created by omitting it:
+/// <tt>make_option('l',help)</tt>. An option can have \a only a long name by putting
+/// 0 as its \c char identifier: `make_option(0,help,"help")`.
+/// \warning The single letter option must be a \c char, between single
+/// quotes, not a \c char* in double quotes:
+/// \code
+/// make_option("h",help); // Does not compile: "h" (char*) must be 'h' (char)
+/// \endcode
+/// It is possible but not a good idea to have an option whose single
+/// letter identifier is a digit. Indeed, the minus sign could be interpreted
+/// either as the introduction of an option or as the sign of a number. The
+/// method \c process tries the former, but failing that accepts it as a
+/// positional argument if it can be interpreted as a number.
+/// \code
+/// bool b;
+/// cmd.add( make_option('1',b) ); // Bad idea to use a digit as identifier
+/// cmd.process(argc,argv);
+/// std::cout << argc << std::endl;
+/// 
+/// $ prog -1
+/// 1
+/// $ prog -3
+/// 2
+/// \endcode
+/// The first run identifies `-1` as the option, removing it from the arguments,
+/// so only `argv[0]` remains; the second one interprets '-2' as a positional
+/// argument, it remains in `argv[1]`.
+///
+/// To decode the command line, the method \c process is called. It extracts
+/// from \c argc and \c argv the options, modifying these variables so that only
+/// positional arguments are left. If an error occurs (unknown option, like "-k"
+/// or missing value after "-l"), an exception, in the form of an
+/// \c std::string, is raised. Our example catches such an exception to indicate
+/// the problem to the user. The variable \c level has a default value of 0,
+/// which is not changed if the corresponding option is not invoked. The
+/// boolean variable \c help is set to \c true only when the switch is used.
+///
+/// The usage information is obtained by `std::cout << cmd`. This lists the
+/// options and their description (set with the \c doc function). Several
+/// fields of \c cmd control the display format:
+///   - \c prefixDoc: an \c std::string to display as prefix before each option,
+/// such as a few spaces or a tabulation.
+///   - \c alignDoc: an integer indicating the column number where option
+/// description should normally start if the length of option name allows.
+///   - \c showDefaults: a boolean (\c true by default) controlling whether
+/// default values of options should be displayed after their description. This
+/// does not concern switches (options without arguments, controlled by a
+/// variable of type \c bool).
+///   - \c section: an \c std::string allowing to group options by sections, see
+/// below.
+///
+/// \warning Notice that if \c showDefault is \c true, it is important that all
+/// variables holding option values be initialized. Variables of type \c bool
+/// are not concerned, since they are automatically set to \c false when used
+/// in an option.
+///
+/// Options can be grouped by section, each holding a \c section (type
+/// \c std::string) field. Instead of specifying the section for each option,
+/// it is more convenient to set \c CmdLine::section, which affects the section
+/// of each subsequent option added. The default section is the empty string.
+/// If options are not all in the same single section, printing the object
+/// \c CmdLine has these effects:
+///    1. Options are sorted by section.
+///    2. The name of each section is output before its options.
+///    3. Section are printed by lexicographic order of their name.
+///
+/// To override such behavior and get back full control, the user can create
+/// a new \c CmdLine filtering a specific section through the dedicated
+/// constructor. For example:
+/// \code
+/// CmdLine cmd;
+/// bool help; int level=0;
+/// cmd.section = "General";
+/// cmd.add( make_option('h', help, "help").doc("usage info") );
+/// cmd.section = "Specific";
+/// cmd.add( make_option('l', level, "level").doc("integer level") );
+/// CmdLine cmdG(cmd, "General"), cmdS(cmd, "Specific");
+/// std::cout << "General:\n" << cmdG << "Specific:\n" << cmdS;
+/// \endcode
+/// The last two lines could be compressed in
+/// \code
+/// std::cout << "General:\n"  << CmdLine(cmd,"General")
+///           << "Specific:\n" << CmdLine(cmd,"Specific");
+/// \endcode
 class CmdLine {
     std::vector<Option*> opts;
 public:
@@ -203,8 +319,10 @@ public:
     int alignDoc; ///< Column where option description starts
     bool showDefaults; ///< Show default values of options
     std::string section; ///< Section where to put next added options
+
     /// Constructor
     CmdLine(): alignDoc(0), showDefaults(true) {}
+    /// Constructor copying only options from a given section
     CmdLine(const CmdLine& cmd, const std::string& sect) {
         *this = cmd;
         opts.clear();
@@ -225,9 +343,8 @@ public:
         c->section = section;
         opts.push_back(c);
     }
-    /// Parse of command line acting as a filter. All options are virtually
-    /// removed from the command line.
-    void process(int& argc, char* argv[]) throw(std::string) {
+    /// Parse line acting as a filter removing options from the command line.
+    void process(int& argc, char* argv[]) {
         std::vector<Option*>::iterator it=opts.begin();
         for(; it != opts.end(); ++it)
             (*it)->used = false;
