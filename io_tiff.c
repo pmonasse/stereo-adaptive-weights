@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /*
  * Copyright (c) 2010, Pascal Monasse <monasse@imagine.enpc.fr>
  * All rights reserved.
@@ -33,6 +34,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 /* option to use a local version of the libtiff */
 #ifdef IO_TIFF_LOCAL_LIBTIFF
@@ -72,8 +74,8 @@ char *io_tiff_info(void)
  */
 static float *readTIFF(TIFF * tif, size_t * nx, size_t * ny)
 {
-    uint32 w = 0, h = 0, i;
-    uint16 spp = 0, bps = 0, fmt = 0;
+    uint32_t w = 0, h = 0, i;
+    uint16_t spp = 0, bps = 0, fmt = 0;
     float *data, *line;
 
     TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &w);
@@ -81,7 +83,7 @@ static float *readTIFF(TIFF * tif, size_t * nx, size_t * ny)
     TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &spp);
     TIFFGetField(tif, TIFFTAG_BITSPERSAMPLE, &bps);
     TIFFGetField(tif, TIFFTAG_SAMPLEFORMAT, &fmt);
-    if (spp != 1 || bps != (uint16) sizeof(float) * 8
+    if (spp != 1 || bps != (uint16_t) sizeof(float) * 8
         || fmt != SAMPLEFORMAT_IEEEFP)
         return NULL;
 
@@ -127,18 +129,18 @@ float *io_tiff_read_f32_gray(const char *fname, size_t * nx, size_t * ny)
 static int writeTIFF(TIFF * tif, const float *data, size_t w, size_t h,
                      size_t c)
 {
-    uint32 rowsperstrip;
+    uint32_t rowsperstrip;
     int ok;
     size_t k, i;
     float *line;
 
-    TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, (uint32) w);
-    TIFFSetField(tif, TIFFTAG_IMAGELENGTH, (uint32) h);
+    TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, (uint32_t) w);
+    TIFFSetField(tif, TIFFTAG_IMAGELENGTH, (uint32_t) h);
     TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_SEPARATE);
-    TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, (uint16) c);
-    TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, (uint16) sizeof(float) * 8);
+    TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, (uint16_t) c);
+    TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, (uint16_t) sizeof(float) * 8);
     TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
-    rowsperstrip = TIFFDefaultStripSize(tif, (uint32) h);
+    rowsperstrip = TIFFDefaultStripSize(tif, (uint32_t) h);
     TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, rowsperstrip);
     TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
     TIFFSetField(tif, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
@@ -147,7 +149,7 @@ static int writeTIFF(TIFF * tif, const float *data, size_t w, size_t h,
     for (k = 0; ok && k < c; k++)
         for (i = 0; ok && i < h; i++) {
             line = (float *) (data + (i + k * h) * w);
-            if (TIFFWriteScanline(tif, line, (uint32) i, (tsample_t) k) < 0) {
+            if (TIFFWriteScanline(tif, line, (uint32_t) i, (tsample_t) k) < 0) {
                 fprintf(stderr, "writeTIFF: error writing row %i\n", (int) i);
                 ok = 0;
             }
