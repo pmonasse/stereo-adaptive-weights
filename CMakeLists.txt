@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
+project(StereoAdpativeWeights)
 
 find_package(PNG)
 find_package(TIFF)
@@ -94,11 +95,11 @@ endif(OPENMP_FOUND)
 
 if(UNIX)
     set_target_properties(stereoAdaptiveWeights PROPERTIES
-                          COMPILE_FLAGS "-Wall -Wextra -Werror ${OpenMP_CXX_FLAGS}")
+                          COMPILE_FLAGS "-Wall -Wextra ${OpenMP_CXX_FLAGS}")
     set_target_properties(show_weights PROPERTIES
-                          COMPILE_FLAGS "-Wall -Wextra -Werror")
+                          COMPILE_FLAGS "-Wall -Wextra")
     set_target_properties(tiff2png PROPERTIES
-                          COMPILE_FLAGS "-Wall -Wextra -Werror")
+                          COMPILE_FLAGS "-Wall -Wextra")
 endif(UNIX)
 if(MSVC)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS)
